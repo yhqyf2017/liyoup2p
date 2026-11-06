@@ -39,7 +39,7 @@ router.beforeEach((to) => {
 })
 
 router.afterEach((to) => {
-  document.title = to.meta.title ? `${to.meta.title} - 励友 P2P 管理控制台` : '励友 P2P 管理控制台'
+  document.title = to.meta.title ? `${to.meta.title} - 励联 LiLink 管理控制台` : '励联 LiLink 管理控制台'
 })
 
 export default router

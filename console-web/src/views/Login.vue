@@ -6,10 +6,10 @@
       <div class="brand-glow glow-b"></div>
       <div class="brand-inner">
         <div class="brand-logo-row">
-          <Logo :size="56" />
-          <span class="brand-logo-name">励友 P2P</span>
+          <Logo :size="56" on-dark />
+          <span class="brand-logo-name">励联 LiLink</span>
         </div>
-        <h1 class="brand-slogan">励友 P2P 安全穿透云</h1>
+        <h1 class="brand-slogan">励联 LiLink 安全穿透云</h1>
         <p class="brand-desc">企业级内网穿透与设备接入管理平台，安全直达每一台内网服务器。</p>
         <ul class="brand-points">
           <li>
@@ -34,7 +34,7 @@
         <div class="login-head">
           <Logo :size="40" />
           <h2>欢迎登录</h2>
-          <p>励友 P2P 管理控制台</p>
+          <p>励联 LiLink 管理控制台</p>
         </div>
         <el-alert
           v-if="errorMsg"

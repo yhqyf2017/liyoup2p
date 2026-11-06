@@ -5,7 +5,7 @@
       <div class="aside-brand">
         <Logo :size="34" />
         <div class="brand-text">
-          <div class="brand-name">励友 P2P</div>
+          <div class="brand-name">励联 LiLink</div>
           <div class="brand-sub">管理控制台</div>
         </div>
       </div>
@@ -47,7 +47,7 @@
           <span>版本发布</span>
         </el-menu-item>
       </el-menu>
-      <div class="aside-footer">励友 P2P 平台 v1.0</div>
+      <div class="aside-footer">励联 LiLink 平台 v1.0 · © 2026 济源市励友软件有限公司</div>
     </aside>
 
     <div class="layout-right">
