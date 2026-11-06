@@ -178,6 +178,7 @@ func (a *App) BuildMode() string {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	startHangWatchdog()     // 卡死取证：持续挂起时落盘 goroutine 栈 + 事件流水
 	go installWindowHook(a) // 子类化主窗口：拦截最小化 → 隐藏到托盘
 	go runWinOpLoop(a)      // 串行消费窗口显隐操作（托盘唤回/最小化隐藏唯一执行点）
 	startTray(a)            // 托盘常驻（图标 + 菜单 + 气泡）
@@ -190,6 +191,7 @@ func (a *App) beforeClose(ctx context.Context) bool {
 	a.mu.Lock()
 	exiting := a.exiting
 	a.mu.Unlock()
+	winTrace("beforeClose exiting=%v", exiting)
 	if exiting {
 		a.StopAgent()
 		a.mu.Lock()
@@ -207,15 +209,17 @@ func (a *App) beforeClose(ctx context.Context) bool {
 }
 
 // ---------- 窗口显隐串行化 ----------
-// 根因（托盘唤回偶发卡死）：
-//   隐藏路径（winhook SC_MINIMIZE / beforeClose → runtime.WindowHide）与
-//   唤回路径（托盘过程 → runtime.WindowUnminimise/Show）在两个 goroutine 上并发执行，
-//   winc 层 Restore() 内部是跨线程 SendMessage(WM_SYSCOMMAND, SC_RESTORE)
-//   （wails 依赖 winc/form.go:142，阻塞等待主窗口线程），与 Hide 的跨线程
-//   ShowWindow(SW_HIDE) 交错时互相等待 → 托盘过程卡死在 Unminimise、主窗口
-//   消息泵停摆（IsHungAppWindow=True，实测 >2min 不自愈）。
-//   修复：所有 runtime.Window* 调用收敛到 runWinOpLoop 单一 goroutine，调用方
-//   （窗口过程/托盘过程/JS 绑定/二次启动）只做非阻塞投递，天然保序且可合并。
+// 根因（最小化/托盘唤回偶发整体无响应）：
+//   1) 前端最小化按钮走 JS WindowMinimise → 跨线程 ShowWindow(SW_MINIMIZE) 真·最小化，
+//      触发 WebView2 最小化/还原缩放周期（主线程同步 COM 调用，快速反复时易卡死）；
+//   2) 托盘唤回走 wails WindowUnminimise → Form.Restore() 内部是跨线程阻塞
+//      SendMessage(WM_SYSCOMMAND, SC_RESTORE)，与最小化交错时互相等待 → 主线程
+//      消息泵停摆（IsHungAppWindow=True，实测 >2min 不自愈）。
+//   修复（双管齐下，消除全部阻塞调用）：
+//   a) 最小化改为「隐藏到托盘」（前端 winMin → App.HideWindow），不再真·最小化，
+//      彻底绕开 WebView2 缩放周期；
+//   b) 显隐统一改用 ShowWindowAsync（把显示命令投递到主线程消息队列，永不阻塞），
+//      不再使用 wails runtime 的跨线程同步 SendMessage；快速连点经队列去抖合并。
 type winOp int
 
 const (
@@ -223,7 +227,13 @@ const (
 	winOpShow
 )
 
-var winOpCh = make(chan winOp, 16)
+var (
+	winOpCh  = make(chan winOp, 16)
+	mainHwnd = struct {
+		mu sync.Mutex
+		h  uintptr
+	}{}
+)
 
 // requestWinOp 非阻塞提交显隐操作（任意线程/窗口过程内可安全调用，永不阻塞）。
 func requestWinOp(op winOp) {
@@ -235,7 +245,7 @@ func requestWinOp(op winOp) {
 }
 
 // runWinOpLoop 显隐操作唯一执行点：去抖合并（吸干队列只执行最后一个操作），
-// 保证 Hide/Show 不重入、不并发；Show 后强制前置，修复唤回后不在前台的问题。
+// 全部经由 ShowWindowAsync 投递到主线程消息队列，非阻塞、不重入、不并发。
 func runWinOpLoop(a *App) {
 	for op := range winOpCh {
 		last := op
@@ -248,24 +258,39 @@ func runWinOpLoop(a *App) {
 				break drain
 			}
 		}
-		if a.ctx == nil {
-			continue
+		mainHwnd.mu.Lock()
+		h := mainHwnd.h
+		mainHwnd.mu.Unlock()
+		if h == 0 {
+			h = mainWindowHwnd()
+			if h == 0 {
+				continue
+			}
+			mainHwnd.mu.Lock()
+			mainHwnd.h = h
+			mainHwnd.mu.Unlock()
 		}
 		switch last {
 		case winOpHide:
+			winTrace("winop: 执行隐藏 hwnd=0x%x", h)
 			a.balloonOnce.Do(func() {
-				trayBalloon("励联 LiLink", "已最小化到任务栏，后台保持连接")
+				trayBalloon("励联 LiLink", "已最小化到托盘，后台保持连接")
 			})
-			runtime.WindowHide(a.ctx)
+			procShowWindowAsync.Call(h, swHide)
 		case winOpShow:
-			runtime.WindowUnminimise(a.ctx)
-			runtime.WindowShow(a.ctx)
+			winTrace("winop: 执行显示 hwnd=0x%x", h)
+			procShowWindowAsync.Call(h, swRestore)
 			foregroundMainWindow()
 		}
 	}
 }
 
 func (a *App) hideToTray() {
+	requestWinOp(winOpHide)
+}
+
+// HideWindow 隐藏主窗口到托盘（前端最小化按钮绑定调用）。
+func (a *App) HideWindow() {
 	requestWinOp(winOpHide)
 }
 

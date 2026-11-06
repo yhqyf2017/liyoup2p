@@ -16,6 +16,8 @@ export function GetLogs():Promise<Array<main.LogEntry>>;
 
 export function GetVersion():Promise<string>;
 
+export function HideWindow():Promise<void>;
+
 export function IsRunning():Promise<boolean>;
 
 export function Login(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:Array<main.MapRule>):Promise<main.LoginResult>;

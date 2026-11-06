@@ -290,21 +290,27 @@ func (t *trayManager) wndProc(hwnd syscall.Handle, msg uint32, wp, lp uintptr) u
 		// 严禁在此直接调 wails runtime（跨线程同步等待会卡死托盘线程与主窗口）。
 		switch lp {
 		case wmLButtonDblClk: // 双击托盘：显示主窗口
+			winTrace("tray: 双击 → 投递显示")
 			t.app.showMainWindow()
 		case wmRButtonUp: // 右键：弹出菜单
+			winTrace("tray: 右键 → 弹菜单")
 			t.showMenu(hwnd)
 		}
 		return 0
 	case wmTrayShow:
+		winTrace("tray: wmTrayShow")
 		t.app.showMainWindow()
 		return 0
 	case wmTrayToggle:
+		winTrace("tray: wmTrayToggle")
 		t.app.toggleConnection()
 		return 0
 	case wmTrayQuit:
+		winTrace("tray: wmTrayQuit")
 		t.app.exitFromTray()
 		return 0
 	case wmTrayUpdate:
+		winTrace("tray: wmTrayUpdate")
 		go t.app.trayCheckUpdate()
 		return 0
 	}
@@ -349,6 +355,7 @@ func (t *trayManager) showMenu(hwnd syscall.Handle) {
 		uintptr(pt.X), uintptr(pt.Y), uintptr(hwnd), 0,
 	)
 	procPostMessageW.Call(uintptr(hwnd), wmNull, 0, 0)
+	winTrace("tray: 菜单选择 id=%d", id)
 	switch id {
 	case menuShow:
 		t.app.showMainWindow()

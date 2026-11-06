@@ -364,7 +364,12 @@ const app = createApp({
     },
 
     // ---------- 自定义标题栏窗口控制 ----------
-    winMin() { window.runtime && window.runtime.WindowMinimise(); },
+    winMin() {
+      // 最小化即隐藏到托盘（后台保持连接）；不走真·最小化，规避 WebView2 还原缩放卡死
+      const h = window.go && window.go.main && window.go.main.App && window.go.main.App.HideWindow;
+      if (h) { h(); return; }
+      window.runtime && window.runtime.WindowHide && window.runtime.WindowHide();
+    },
     winClose() {
       // 走 Wails 关闭链路 → OnBeforeClose → 隐藏到托盘（Agent 后台保持运行）；
       // 真正退出经托盘菜单「退出」，会先停 Agent 再结束进程

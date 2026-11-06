@@ -30,6 +30,10 @@ export function GetVersion() {
   return window['go']['main']['App']['GetVersion']();
 }
 
+export function HideWindow() {
+  return window['go']['main']['App']['HideWindow']();
+}
+
 export function IsRunning() {
   return window['go']['main']['App']['IsRunning']();
 }

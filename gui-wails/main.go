@@ -6,7 +6,6 @@ import (
 	"embed"
 	"os"
 	"os/exec"
-	"strings"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -23,6 +22,9 @@ var isRelease = "false"
 
 func main() {
 	app := NewApp()
+	// 自研单实例（替代 wails SingleInstanceLock）：wails 用阻塞 SendMessage 通知
+	// 首实例，首实例挂死会把后续启动卡成无窗口僵尸；本实现永不阻塞并支持挂死接管。
+	setupSingleInstance(app)
 	err := wails.Run(&options.App{
 		Title:     "励联 LiLink",
 		Width:     960,
@@ -36,19 +38,6 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 244, G: 247, B: 251, A: 255},
 		OnStartup:        app.startup,
 		OnBeforeClose:    app.beforeClose,
-		// 单实例：重复启动时唤起已有窗口并退出新进程；带 --check-update 参数则触发自动升级检查
-		SingleInstanceLock: &options.SingleInstanceLock{
-			UniqueId: "liyou-p2p-gui-9f3c2b7a",
-			OnSecondInstanceLaunch: func(d options.SecondInstanceData) {
-				for _, arg := range d.Args {
-					if strings.EqualFold(strings.TrimSpace(arg), "--check-update") {
-						go app.autoCheckUpdate()
-						return
-					}
-				}
-				app.showMainWindow()
-			},
-		},
 		Bind: []interface{}{
 			app,
 		},
