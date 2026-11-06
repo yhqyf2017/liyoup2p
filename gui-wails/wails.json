@@ -1,0 +1,18 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "LiYouP2P",
+  "outputfilename": "LiYouP2P",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev:watcher": "",
+  "frontend:dev:serverUrl": "",
+  "author": {
+    "name": "LiYou"
+  },
+  "info": {
+    "productName": "励联 LiLink",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright © 2026 济源市励友软件有限公司",
+    "comments": "励联 LiLink 安全穿透客户端"
+  }
+}

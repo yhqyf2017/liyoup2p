@@ -1,0 +1,207 @@
+/* 励友 P2P 管理控制台 - 全局样式（企业级浅色主题） */
+
+:root {
+  /* Element Plus 主色定制 */
+  --el-color-primary: #1667C8;
+  --el-color-primary-light-3: #4A8AD8;
+  --el-color-primary-light-5: #7FABE2;
+  --el-color-primary-light-7: #B3CDEC;
+  --el-color-primary-light-8: #CFE0F4;
+  --el-color-primary-light-9: #E9F1FB;
+  --el-color-primary-dark-2: #0F51A8;
+
+  /* 文字与边框 */
+  --el-text-color-primary: #16233C;
+  --el-text-color-regular: #57677F;
+  --el-text-color-secondary: #8C99AE;
+  --el-text-color-placeholder: #A9B4C6;
+  --el-border-color: #E3E8F0;
+  --el-border-color-light: #E3E8F0;
+  --el-border-color-lighter: #EBF0F7;
+  --el-fill-color-light: #F3F5F9;
+  --el-fill-color-lighter: #F8FAFD;
+
+  --el-font-size-base: 14px;
+
+  /* 间距刻度（4 基数） */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: 'HarmonyOS Sans SC', 'MiSans', 'Microsoft YaHei UI', -apple-system, 'Segoe UI', Arial, sans-serif;
+  font-size: 14px;
+  color: #16233C;
+  background-color: #F3F5F9;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  height: 100%;
+}
+
+/* 数字使用等宽数字 */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 内容卡片 */
+.page-card {
+  background: #FFFFFF;
+  border: 1px solid #E3E8F0;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(22, 35, 60, 0.04);
+}
+
+/* 页面通用布局：四段式（页头/筛选/表格/分页），段间 16-20px */
+.page-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+/* 页头：标题 + 描述 + 主操作（与内容区间距 20px = gap 16 + 4） */
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-1);
+}
+
+.page-header .ph-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #16233C;
+  line-height: 1.4;
+}
+
+.page-header .ph-desc {
+  margin: var(--sp-1) 0 0;
+  font-size: 12.5px;
+  color: #57677F;
+  line-height: 1.5;
+}
+
+.page-header .ph-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+/* 筛选卡片：独立白卡承载查询条件（段间距由 page-view gap 提供） */
+.filter-card {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  background: #FFFFFF;
+  border: 1px solid #E3E8F0;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(22, 35, 60, 0.04);
+}
+
+.filter-card .f-spacer {
+  flex: 1;
+}
+
+.page-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #16233C;
+}
+
+.page-desc {
+  font-size: 13px;
+  color: #8C99AE;
+  margin-top: 2px;
+}
+
+/* 表格微调 */
+.el-table {
+  --el-table-header-bg-color: #F8FAFD;
+  --el-table-header-text-color: #57677F;
+  --el-table-border-color: #EBF0F7;
+  --el-table-row-hover-bg-color: #F6F9FD;
+  font-size: 13.5px;
+}
+
+.el-table th.el-table__cell {
+  padding: 10px 0;
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+.el-table td.el-table__cell {
+  padding: 12px 0;
+}
+
+/* 弹窗：12px 圆角 + 充裕内边距，footer 按钮右对齐 gap 12px */
+.el-dialog {
+  border-radius: 12px;
+}
+
+.el-dialog__header {
+  padding: var(--sp-5) var(--sp-6) 0;
+}
+
+.el-dialog__body {
+  padding: var(--sp-4) var(--sp-6) var(--sp-5);
+}
+
+.el-dialog__footer {
+  padding: 0 var(--sp-6) var(--sp-5);
+}
+
+.el-dialog__footer .el-button + .el-button {
+  margin-left: var(--sp-3);
+}
+
+/* 路由切换过渡（200ms） */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #C7D0DE;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #A9B4C6;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}

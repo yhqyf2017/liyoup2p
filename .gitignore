@@ -1,0 +1,48 @@
+# ===== 敏感凭据（绝不入库）=====
+.env
+*.env
+.cli-token
+.cli-uid
+.srv-token
+.srv-uid
+diag-tmp/
+
+# ===== 可执行文件与临时/备份产物 =====
+*.exe
+*.exe.old
+*.old
+*.old-*
+*.log
+*.tmp
+*.bak
+
+# ===== 前端构建产物（源码入库，产物本地生成）=====
+node_modules/
+console-web/dist/
+gui-wails/frontend/dist/
+
+# ===== 安装包成品与更新通道运行数据 =====
+installer/dist/
+update/
+
+# ===== 移动端构建中间产物 =====
+mobile/build/
+mobile/.gradle/
+mobile/.dart_tool/
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/local.properties
+mobile/android/.kotlin/
+mobile/ios/Pods/
+
+# ===== 其他构建中间产物（gui-wails/build 为 wails 资源源文件，保留入库）=====
+agent-go/build/
+agent-go/*.aar
+platform-go/build/
+
+# ===== IDE / 系统文件 =====
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store
