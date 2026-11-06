@@ -31,12 +31,11 @@
       <div class="brand-panel">
         <img class="brand-logo" src="assets/logo-mark.png" alt="励联 LiLink 徽标" draggable="false">
         <div class="brand-name">励联 LiLink<span class="brand-star" aria-hidden="true">✦</span></div>
-        <div class="brand-slogan">安全连接 · 远程访问</div>
-        <div class="brand-co">济源市励友软件有限公司</div>
+        <div class="brand-slogan">安全连接 · 访问公司内网系统</div>
         <ul class="brand-features">
-          <li>UDP 打洞 P2P 直连，中继智能兜底</li>
-          <li>端到端加密，平台仅转发密文</li>
-          <li>端口映射，本机入口直达远程服务</li>
+          <li>数据全程加密传输，他人无法窃听</li>
+          <li>无需开放公网端口，外网也能访问公司系统</li>
+          <li>在本机输入熟悉的地址，直接打开远程系统</li>
         </ul>
         <div class="brand-foot">© 2026 济源市励友软件有限公司</div>
       </div>
@@ -44,7 +43,7 @@
       <div class="form-panel">
         <div class="form-inner glass-card">
           <h2 class="form-title">登录控制台</h2>
-          <p class="form-sub">登录平台并注册本机设备，建立安全穿透通道</p>
+          <p class="form-sub">登录后，本机即可安全访问公司系统</p>
 
           <div class="role-cards">
             <div class="role-card" :class="{active: form.role==='server'}" @click="form.role='server'">
@@ -52,14 +51,14 @@
                 <span class="role-ico">▣</span>
                 <span class="role-title">服务端</span>
               </div>
-              <div class="role-desc">业务服务器 · 申报可穿透端口供远程访问</div>
+              <div class="role-desc">公司服务器所在电脑 · 提供系统给别人远程访问</div>
             </div>
             <div class="role-card" :class="{active: form.role==='client'}" @click="form.role='client'">
               <div class="role-head">
                 <span class="role-ico">◉</span>
                 <span class="role-title">客户端</span>
               </div>
-              <div class="role-desc">员工电脑 · 本地入口映射远程服务</div>
+              <div class="role-desc">打开本机地址，直接访问公司服务器上的系统</div>
             </div>
           </div>
 
@@ -214,7 +213,7 @@
             <el-button size="small" text @click="logs=[]">清空</el-button>
           </div>
           <div class="log-box" ref="logBox">
-            <div v-for="(l, i) in logs" :key="i" class="log-line" :class="l.level">
+            <div v-for="l in shownLogs" :key="l._seq" class="log-line" :class="l.level">
               <span class="log-time">{{ l.time }}</span>{{ l.text }}
             </div>
             <div v-if="!logs.length" class="empty-tip">暂无日志</div>
