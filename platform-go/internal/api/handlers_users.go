@@ -43,8 +43,12 @@ func (a *UsersAPI) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	actor := CurrentUser(r)
 	req.Username = strings.TrimSpace(req.Username)
-	if req.Username == "" || len(req.Password) < 6 {
-		Fail(w, http.StatusBadRequest, 1003, "用户名不能为空，密码至少 6 位")
+	if req.Username == "" {
+		Fail(w, http.StatusBadRequest, 1001, "用户名不能为空")
+		return
+	}
+	if err := validatePasswordPolicy(req.Password); err != nil {
+		Fail(w, http.StatusBadRequest, 1003, err.Error())
 		return
 	}
 	if !validRoles[req.Role] {
@@ -159,8 +163,8 @@ func (a *UsersAPI) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	if !ReadJSON(w, r, &req) {
 		return
 	}
-	if len(req.Password) < 6 {
-		Fail(w, http.StatusBadRequest, 1003, "密码至少 6 位")
+	if err := validatePasswordPolicy(req.Password); err != nil {
+		Fail(w, http.StatusBadRequest, 1003, err.Error())
 		return
 	}
 	actor := CurrentUser(r)
