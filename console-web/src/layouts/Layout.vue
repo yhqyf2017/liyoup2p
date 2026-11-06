@@ -42,6 +42,10 @@
           <el-icon><OfficeBuilding /></el-icon>
           <span>租户管理</span>
         </el-menu-item>
+        <el-menu-item v-if="superRole" index="/updates">
+          <el-icon><Upload /></el-icon>
+          <span>版本发布</span>
+        </el-menu-item>
       </el-menu>
       <div class="aside-footer">励友 P2P 平台 v1.0</div>
     </aside>

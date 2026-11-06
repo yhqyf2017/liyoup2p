@@ -19,6 +19,7 @@ const routes = [
       { path: 'alerts', component: () => import('../views/Alerts.vue'), meta: { title: '告警中心' } },
       { path: 'users', component: () => import('../views/Users.vue'), meta: { title: '成员管理' } },
       { path: 'tenants', component: () => import('../views/Tenants.vue'), meta: { title: '租户管理', roles: ['super_admin'] } },
+      { path: 'updates', component: () => import('../views/Updates.vue'), meta: { title: '版本发布', roles: ['super_admin'] } },
     ],
   },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' },
