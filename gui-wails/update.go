@@ -237,29 +237,32 @@ func (a *App) ApplyUpdate() error {
 		updateFileLogf("sha256 mismatch: expect=%s got=%s", li.SHA256, got)
 		return err
 	}
-	a.logf("info", "升级包校验通过，正在停止连接并解压…")
+	a.logf("info", "升级包校验通过，正在解压并校验内容…")
 	updateFileLogf("sha256 ok")
 
-	// 停止 Agent 子进程（升级窗口期连接不可用）
-	a.StopAgent()
-
-	// 解压（防路径穿越）
+	// 先解压校验内容，全部就绪后才停 Agent（避免停了连接才发现包不可用）
 	stage := filepath.Join(dir, "stage")
 	_ = os.RemoveAll(stage)
 	if err := extractZip(zipPath, stage); err != nil {
+		a.logf("error", "解压升级包失败：%v（已保留现有程序，未做任何替换）", err)
 		updateFileLogf("unzip failed: %v", err)
 		return fmt.Errorf("解压升级包失败：%w", err)
 	}
 	newGUI, err := findInDir(stage, "LiYouP2P.exe")
 	if err != nil {
+		a.logf("error", "升级包缺少 LiYouP2P.exe，已放弃升级（未做任何替换）")
 		updateFileLogf("zip missing LiYouP2P.exe")
 		return errors.New("升级包缺少 LiYouP2P.exe")
 	}
 	newAgent, err := findInDir(stage, "liyou-agent.exe")
 	if err != nil {
+		a.logf("error", "升级包缺少 liyou-agent.exe，已放弃升级（未做任何替换）")
 		updateFileLogf("zip missing liyou-agent.exe")
 		return errors.New("升级包缺少 liyou-agent.exe")
 	}
+
+	// 内容就绪：停止 Agent 子进程（升级窗口期连接不可用）
+	a.StopAgent()
 
 	// 备份替换（主程序 + Agent），失败回滚
 	exePath, err := os.Executable()
@@ -277,6 +280,7 @@ func (a *App) ApplyUpdate() error {
 	}
 	restore := func(why error) error {
 		_ = os.Rename(backup, exePath)
+		a.logf("error", "升级替换失败已回滚：%v", why)
 		updateFileLogf("rollback: %v", why)
 		return why
 	}

@@ -1,4 +1,4 @@
-﻿# 励联 P2P 平台启动脚本：读取 platform-go\.env 注入环境变量后启动平台。
+# 励联 P2P 平台启动脚本：读取 platform-go\.env 注入环境变量后启动平台。
 # 用法：powershell -ExecutionPolicy Bypass -File start-platform.ps1
 $ErrorActionPreference = 'Stop'
 
