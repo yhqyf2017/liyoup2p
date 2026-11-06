@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>励联 LiLink</title>
+  <link rel="stylesheet" href="vendor/element-plus.css">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div id="app" v-cloak>
+
+    <!-- ==================== 登录页 ==================== -->
+    <div v-if="page==='login'" class="login-wrap fade-in">
+      <div class="bg-blob blob-a" aria-hidden="true"></div>
+      <div class="bg-blob blob-b" aria-hidden="true"></div>
+      <div class="bg-blob blob-c" aria-hidden="true"></div>
+
+      <header class="titlebar titlebar-login" style="--wails-draggable: drag">
+        <span class="tb-brand">励联 LiLink<span class="tb-star">✦</span></span>
+        <div class="win-btns" style="--wails-draggable: no-drag">
+          <button class="win-btn" type="button" aria-label="最小化" @click="winMin">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6H10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          </button>
+          <button class="win-btn win-close" type="button" aria-label="关闭" @click="winClose">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3L9 9M9 3L3 9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="brand-panel">
+        <img class="brand-logo" src="assets/logo-mark.png" alt="励联 LiLink 徽标" draggable="false">
+        <div class="brand-name">励联 LiLink<span class="brand-star" aria-hidden="true">✦</span></div>
+        <div class="brand-slogan">安全连接 · 远程访问</div>
+        <div class="brand-co">济源市励友软件有限公司</div>
+        <ul class="brand-features">
+          <li>UDP 打洞 P2P 直连，中继智能兜底</li>
+          <li>端到端加密，平台仅转发密文</li>
+          <li>端口映射，本机入口直达远程服务</li>
+        </ul>
+        <div class="brand-foot">© 2026 济源市励友软件有限公司</div>
+      </div>
+
+      <div class="form-panel">
+        <div class="form-inner glass-card">
+          <h2 class="form-title">登录控制台</h2>
+          <p class="form-sub">登录平台并注册本机设备，建立安全穿透通道</p>
+
+          <div class="role-cards">
+            <div class="role-card" :class="{active: form.role==='server'}" @click="form.role='server'">
+              <div class="role-head">
+                <span class="role-ico">▣</span>
+                <span class="role-title">服务端</span>
+              </div>
+              <div class="role-desc">业务服务器 · 申报可穿透端口供远程访问</div>
+            </div>
+            <div class="role-card" :class="{active: form.role==='client'}" @click="form.role='client'">
+              <div class="role-head">
+                <span class="role-ico">◉</span>
+                <span class="role-title">客户端</span>
+              </div>
+              <div class="role-desc">员工电脑 · 本地入口映射远程服务</div>
+            </div>
+          </div>
+
+          <el-form label-position="top" @submit.prevent="doLogin">
+            <el-form-item v-if="!isRelease" label="服务器地址">
+              <el-input v-model="form.platform" placeholder="如 http://127.0.0.1:8900" clearable></el-input>
+            </el-form-item>
+            <div class="form-row">
+              <el-form-item label="租户编码">
+                <el-input v-model="form.tenant" placeholder="租户编码" clearable></el-input>
+              </el-form-item>
+              <el-form-item label="设备名称">
+                <el-input v-model="form.devName" placeholder="默认取计算机名" clearable></el-input>
+              </el-form-item>
+            </div>
+            <div class="form-row">
+              <el-form-item label="账号">
+                <el-input v-model="form.user" placeholder="平台账号" clearable></el-input>
+              </el-form-item>
+              <el-form-item label="密码">
+                <el-input v-model="form.pass" type="password" placeholder="平台密码" show-password
+                          @keyup.enter="doLogin"></el-input>
+              </el-form-item>
+            </div>
+            <el-button type="primary" class="login-btn" :loading="loading" @click="doLogin">
+              {{ loading ? '登录中…' : '登 录' }}
+            </el-button>
+          </el-form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 工作页 ==================== -->
+    <div v-else class="work-wrap fade-in">
+      <header class="titlebar titlebar-work" style="--wails-draggable: drag">
+        <div class="topbar-left">
+          <img class="top-logo" src="assets/logo-mark.png" alt="励友软件徽标" draggable="false">
+          <span class="top-title">励联 LiLink</span>
+          <span class="mode-badge" :class="session.device_role">
+            {{ session.device_role==='server' ? '服务端模式' : '客户端模式' }}
+          </span>
+        </div>
+        <div class="topbar-right" style="--wails-draggable: no-drag">
+          <span class="top-version" :title="'当前版本 v' + appVersion">v{{ appVersion }}</span>
+          <el-button size="small" @click="checkUpdate">检查更新</el-button>
+          <span class="top-user">{{ session.user ? session.user.username : '' }}</span>
+          <el-button size="small" @click="doLogout">退出登录</el-button>
+          <div class="win-btns">
+            <button class="win-btn" type="button" aria-label="最小化" @click="winMin">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6H10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            </button>
+            <button class="win-btn win-close" type="button" aria-label="关闭" @click="winClose">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3L9 9M9 3L3 9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="work-main">
+        <!-- 连接状态卡 -->
+        <section class="card status-card">
+          <span class="status-dot" :class="{on: running}"></span>
+          <div class="status-text">
+            <div class="status-big">{{ running ? '连接运行中' : '未连接' }}</div>
+            <div class="status-sub">
+              设备 {{ session.device_uid }} · {{ session.device_name }}<span v-if="!isRelease && session.platform_url"> · 平台 {{ session.platform_url }}</span>
+            </div>
+          </div>
+          <el-button :type="running ? 'danger' : 'primary'" size="large"
+                     :loading="switching" @click="toggleAgent">
+            {{ running ? '停止连接' : '启动连接' }}
+          </el-button>
+        </section>
+
+        <!-- 服务端：已开放服务列表 -->
+        <section v-if="session.device_role==='server'" class="card">
+          <div class="card-title">已开放服务</div>
+          <div v-if="declaredPorts.length" class="port-tags">
+            <span v-for="p in declaredPorts" :key="p.port" class="port-tag">
+              <b>{{ p.port }}</b><i v-if="p.label">{{ p.label }}</i>
+            </span>
+          </div>
+          <div v-else class="empty-tip">启动连接后，将自动探测并申报本机开放的服务端口</div>
+        </section>
+
+        <!-- 服务端：允许访问的内网主机 -->
+        <section v-if="session.device_role==='server'" class="card">
+          <div class="card-title">允许访问的内网主机</div>
+          <p class="card-sub">默认仅允许本机；添加后可访问同网段其他电脑的服务</p>
+          <div class="host-list">
+            <div v-for="h in serverHosts" :key="h" class="host-row">
+              <span class="host-name">{{ h }}</span>
+              <span v-if="h==='127.0.0.1'" class="host-default-tag">本机 · 默认</span>
+              <el-button v-else size="small" type="danger" plain
+                         :loading="removingHost===h" @click="removeHost(h)">删除</el-button>
+            </div>
+          </div>
+          <div class="host-add-row">
+            <el-input v-model="newHost" size="small" clearable
+                      placeholder="如 192.168.5.20 或 jyerp.local（精确 IP / 主机名）"
+                      @keyup.enter="addHost"></el-input>
+            <el-button size="small" type="primary" plain :loading="hostBusy" @click="addHost">添加</el-button>
+          </div>
+        </section>
+
+        <!-- 客户端：端口映射 -->
+        <section v-else class="card">
+          <div class="card-title-row">
+            <span class="card-title">端口映射</span>
+            <div>
+              <el-button size="small" @click="addRule">添加规则</el-button>
+              <el-button size="small" type="primary" plain :disabled="!rules.length" @click="openPage">
+                打开服务器页面
+              </el-button>
+            </div>
+          </div>
+          <table class="map-table">
+            <thead>
+              <tr>
+                <th style="width:26%">远端目标端口</th>
+                <th style="width:26%">目标主机</th>
+                <th style="width:22%">本地监听端口</th>
+                <th style="width:84px">状态</th>
+                <th style="width:158px">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(r, i) in rules" :key="i">
+                <td><el-input v-model.number="r.remote" :disabled="r.applied" placeholder="如 8080" size="small"></el-input></td>
+                <td><el-input v-model="r.host" :disabled="r.applied" placeholder="默认（服务器本机）" size="small" clearable></el-input></td>
+                <td><el-input v-model="r.local" :disabled="r.applied" placeholder="如 18081" size="small"></el-input></td>
+                <td>
+                  <span v-if="r.applied" class="live-tag">已生效</span>
+                  <span v-else class="draft-tag">未生效</span>
+                </td>
+                <td>
+                  <el-button v-if="!r.applied" size="small" type="primary" plain :loading="r.busy" @click="applyRule(i)">生效</el-button>
+                  <el-button size="small" type="danger" plain :loading="r.busy" @click="removeRule(i)">删除</el-button>
+                </td>
+              </tr>
+              <tr v-if="!rules.length">
+                <td colspan="5" class="empty-tip">暂无映射规则，点击「添加规则」新增（如 8080 → 18081）</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- 日志 -->
+        <section class="card log-card">
+          <div class="card-title-row">
+            <span class="card-title">运行日志</span>
+            <el-button size="small" text @click="logs=[]">清空</el-button>
+          </div>
+          <div class="log-box" ref="logBox">
+            <div v-for="(l, i) in logs" :key="i" class="log-line" :class="l.level">
+              <span class="log-time">{{ l.time }}</span>{{ l.text }}
+            </div>
+            <div v-if="!logs.length" class="empty-tip">暂无日志</div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="copyright">© 2026 济源市励友软件有限公司 · 励联 LiLink</footer>
+    </div>
+  </div>
+
+  <script src="vendor/vue.global.prod.js"></script>
+  <script src="vendor/element-plus.full.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
