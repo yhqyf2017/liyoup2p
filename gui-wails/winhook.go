@@ -49,9 +49,12 @@ func installWindowHook(app *App) {
 	}
 
 	subClassState.callback = syscall.NewCallback(func(hwnd syscall.Handle, msg uint32, wp, lp uintptr) uintptr {
-		// 最小化系统命令 → 隐藏到托盘（不执行真正最小化）
+		// 最小化系统命令 → 隐藏到托盘（不执行真正最小化）。
+		// 窗口过程内不得做任何可能阻塞的调用：hideToTray 里的 Shell_NotifyIconW 是
+		// 跨进程交互（Explorer 忙时可能阻塞），放 goroutine 执行，窗口过程立即返回，
+		// 避免「偶发窗口未响应」。
 		if msg == wmSyscommand && wp&scMask == scMinimize {
-			app.hideToTray()
+			go app.hideToTray()
 			return 0
 		}
 		ret, _, _ := procCallWindowProc.Call(subClassState.prevWndProc, uintptr(hwnd), uintptr(msg), wp, lp)

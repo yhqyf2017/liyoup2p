@@ -90,9 +90,10 @@ type envelope struct {
 }
 
 const (
-	logBufSize       = 1000                // 历史日志环形缓冲封顶
-	logFlushBatch    = 20                  // 待推送条数达此值立即合并推送
-	logFlushInterval = 150 * time.Millisecond // 否则最长等待时间后合并推送
+	logBufSize       = 1000                   // 历史日志环形缓冲封顶
+	logFlushBatch    = 50                     // 待推送条数达此值立即合并推送
+	logFlushInterval = 250 * time.Millisecond // 否则最长等待时间后合并推送
+	logMaxEmitBatch  = 256                    // 单次推送条数封顶：限制单条事件 payload，超出部分下轮继续
 
 	// codeKicked 平台业务码：同端类型已被新登录顶替（账号已在其他设备登录）
 	codeKicked = 4016
@@ -284,6 +285,7 @@ func (a *App) logf(level, format string, v ...any) {
 }
 
 // flushLogs 将待推送缓冲合并为一次事件推送（定时器与满批共用）。
+// 单次最多推送 logMaxEmitBatch 条（限制 payload 体积），有剩余时保持定时器继续刷。
 func (a *App) flushLogs() {
 	a.logMu.Lock()
 	if a.logTimer != nil {
@@ -292,6 +294,14 @@ func (a *App) flushLogs() {
 	}
 	batch := a.logPending
 	a.logPending = nil
+	if len(batch) > logMaxEmitBatch {
+		a.logPending = batch[logMaxEmitBatch:]
+		batch = batch[:logMaxEmitBatch]
+	}
+	rest := len(a.logPending) > 0
+	if rest && a.logTimer == nil {
+		a.logTimer = time.AfterFunc(logFlushInterval, a.flushLogs)
+	}
 	a.logMu.Unlock()
 	if len(batch) > 0 && a.ctx != nil {
 		runtime.EventsEmit(a.ctx, "log", batch)
