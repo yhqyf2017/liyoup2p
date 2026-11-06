@@ -19,11 +19,21 @@ const (
 )
 
 var (
-	procFindWindowW      = user32.NewProc("FindWindowW")
-	procSetWindowLongPtr = user32.NewProc("SetWindowLongPtrW")
-	procCallWindowProc   = user32.NewProc("CallWindowProcW")
-	procIsWindowVisible  = user32.NewProc("IsWindowVisible")
+	procFindWindowW         = user32.NewProc("FindWindowW")
+	procSetWindowLongPtr    = user32.NewProc("SetWindowLongPtrW")
+	procCallWindowProc      = user32.NewProc("CallWindowProcW")
+	procIsWindowVisible     = user32.NewProc("IsWindowVisible")
+	procSetForegroundWindow = user32.NewProc("SetForegroundWindow")
 )
+
+// foregroundMainWindow 将主窗口强制置前台（唤回后焦点归属问题的兜底）。
+func foregroundMainWindow() {
+	name, _ := syscall.UTF16PtrFromString("wailsWindow")
+	h, _, _ := procFindWindowW.Call(uintptr(unsafe.Pointer(name)), 0)
+	if h != 0 {
+		procSetForegroundWindow.Call(h)
+	}
+}
 
 // subClassState 子类化后的原窗口过程与回调（包级保存，回调必须存活于进程生命周期）。
 var subClassState struct {
@@ -50,11 +60,10 @@ func installWindowHook(app *App) {
 
 	subClassState.callback = syscall.NewCallback(func(hwnd syscall.Handle, msg uint32, wp, lp uintptr) uintptr {
 		// 最小化系统命令 → 隐藏到托盘（不执行真正最小化）。
-		// 窗口过程内不得做任何可能阻塞的调用：hideToTray 里的 Shell_NotifyIconW 是
-		// 跨进程交互（Explorer 忙时可能阻塞），放 goroutine 执行，窗口过程立即返回，
-		// 避免「偶发窗口未响应」。
+		// 窗口过程内只做非阻塞投递（requestWinOp），任何跨线程/跨进程/同步等待
+		// 都可能造成窗口未响应，实际显隐由 runWinOpLoop 串行 goroutine 执行。
 		if msg == wmSyscommand && wp&scMask == scMinimize {
-			go app.hideToTray()
+			requestWinOp(winOpHide)
 			return 0
 		}
 		ret, _, _ := procCallWindowProc.Call(subClassState.prevWndProc, uintptr(hwnd), uintptr(msg), wp, lp)

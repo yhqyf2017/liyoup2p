@@ -179,6 +179,7 @@ func (a *App) BuildMode() string {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	go installWindowHook(a) // 子类化主窗口：拦截最小化 → 隐藏到托盘
+	go runWinOpLoop(a)      // 串行消费窗口显隐操作（托盘唤回/最小化隐藏唯一执行点）
 	startTray(a)            // 托盘常驻（图标 + 菜单 + 气泡）
 }
 
@@ -205,21 +206,76 @@ func (a *App) beforeClose(ctx context.Context) bool {
 	return true
 }
 
-// hideToTray 隐藏主窗口到托盘（首次给出气泡提示，后台保持 Agent 连接）。
+// ---------- 窗口显隐串行化 ----------
+// 根因（托盘唤回偶发卡死）：
+//   隐藏路径（winhook SC_MINIMIZE / beforeClose → runtime.WindowHide）与
+//   唤回路径（托盘过程 → runtime.WindowUnminimise/Show）在两个 goroutine 上并发执行，
+//   winc 层 Restore() 内部是跨线程 SendMessage(WM_SYSCOMMAND, SC_RESTORE)
+//   （wails 依赖 winc/form.go:142，阻塞等待主窗口线程），与 Hide 的跨线程
+//   ShowWindow(SW_HIDE) 交错时互相等待 → 托盘过程卡死在 Unminimise、主窗口
+//   消息泵停摆（IsHungAppWindow=True，实测 >2min 不自愈）。
+//   修复：所有 runtime.Window* 调用收敛到 runWinOpLoop 单一 goroutine，调用方
+//   （窗口过程/托盘过程/JS 绑定/二次启动）只做非阻塞投递，天然保序且可合并。
+type winOp int
+
+const (
+	winOpHide winOp = iota
+	winOpShow
+)
+
+var winOpCh = make(chan winOp, 16)
+
+// requestWinOp 非阻塞提交显隐操作（任意线程/窗口过程内可安全调用，永不阻塞）。
+func requestWinOp(op winOp) {
+	select {
+	case winOpCh <- op:
+	default:
+		// 队列满：丢弃，最后一次操作会覆盖到目标状态
+	}
+}
+
+// runWinOpLoop 显隐操作唯一执行点：去抖合并（吸干队列只执行最后一个操作），
+// 保证 Hide/Show 不重入、不并发；Show 后强制前置，修复唤回后不在前台的问题。
+func runWinOpLoop(a *App) {
+	for op := range winOpCh {
+		last := op
+	drain:
+		for {
+			select {
+			case o := <-winOpCh:
+				last = o
+			default:
+				break drain
+			}
+		}
+		if a.ctx == nil {
+			continue
+		}
+		switch last {
+		case winOpHide:
+			a.balloonOnce.Do(func() {
+				trayBalloon("励联 LiLink", "已最小化到任务栏，后台保持连接")
+			})
+			runtime.WindowHide(a.ctx)
+		case winOpShow:
+			runtime.WindowUnminimise(a.ctx)
+			runtime.WindowShow(a.ctx)
+			foregroundMainWindow()
+		}
+	}
+}
+
 func (a *App) hideToTray() {
-	a.balloonOnce.Do(func() {
-		trayBalloon("励联 LiLink", "已最小化到任务栏，后台保持连接")
-	})
-	runtime.WindowHide(a.ctx)
+	requestWinOp(winOpHide)
 }
 
 // showMainWindow 显示并前置主窗口（托盘双击/菜单、二次启动唤起共用）。
+// 仅投递请求，实际显隐由 runWinOpLoop 串行执行——窗口/托盘过程内不得同步调 wails runtime。
 func (a *App) showMainWindow() {
 	if a.ctx == nil {
 		return
 	}
-	runtime.WindowUnminimise(a.ctx)
-	runtime.WindowShow(a.ctx)
+	requestWinOp(winOpShow)
 }
 
 // toggleConnection 托盘「启动连接/停止连接」：与主窗口按钮等效，状态双向同步。

@@ -286,6 +286,8 @@ func (t *trayManager) run() {
 func (t *trayManager) wndProc(hwnd syscall.Handle, msg uint32, wp, lp uintptr) uintptr {
 	switch msg {
 	case trayCallbackMsg:
+		// 托盘过程内只允许非阻塞操作：showMainWindow 仅投递请求（见 runWinOpLoop），
+		// 严禁在此直接调 wails runtime（跨线程同步等待会卡死托盘线程与主窗口）。
 		switch lp {
 		case wmLButtonDblClk: // 双击托盘：显示主窗口
 			t.app.showMainWindow()
