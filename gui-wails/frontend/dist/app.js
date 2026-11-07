@@ -12,7 +12,7 @@ const app = createApp({
       running: false,
       form: {
         platform: 'http://127.0.0.1:8900',
-        tenant: 'liyou-demo',
+        tenant: 'liyou',
         user: '',
         pass: '',
         devName: '',

@@ -34,7 +34,7 @@ func newFakeStore(t *testing.T, pass string) *fakeAuthStore {
 			"admin": {ID: 2, TenantID: storeInt64(1), Username: "admin", PasswordHash: hash, Role: "tenant_admin", Status: "active"},
 		},
 		tenants: map[string]*store.Tenant{
-			"liyou-demo": {ID: 1, Name: "武汉理游商贸", Code: "liyou-demo", Status: "active"},
+			"liyou": {ID: 1, Name: "武汉理游商贸", Code: "liyou", Status: "active"},
 		},
 		seqs: map[string]int64{},
 	}
@@ -113,7 +113,7 @@ func TestLoginSuccess(t *testing.T) {
 	if err := json.Unmarshal(env.Data, &data); err != nil {
 		t.Fatalf("解析 data 失败: %v", err)
 	}
-	if data.User.Username != "admin" || data.User.Role != "tenant_admin" || data.User.Tenant != "liyou-demo" {
+	if data.User.Username != "admin" || data.User.Role != "tenant_admin" || data.User.Tenant != "liyou" {
 		t.Fatalf("用户信息不符: %+v", data.User)
 	}
 	claims, err := apiH.JWT.Parse(data.AccessToken)

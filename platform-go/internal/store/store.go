@@ -148,12 +148,12 @@ func (s *Store) Seed(ctx context.Context, adminHash, superHash string) error {
 		}
 	}
 	if _, err := s.DB.ExecContext(ctx, `INSERT INTO tenants (name, code, plan_id)
-		SELECT '武汉理游商贸', 'liyou-demo', id FROM plans WHERE name='专业版'
+		SELECT '武汉理游商贸', 'liyou', id FROM plans WHERE name='专业版'
 		ON CONFLICT (code) DO NOTHING`); err != nil {
 		return fmt.Errorf("种子租户写入失败: %w", err)
 	}
 	if _, err := s.DB.ExecContext(ctx, `INSERT INTO users (tenant_id, username, password_hash, role)
-		SELECT t.id, 'admin', $1, 'tenant_admin' FROM tenants t WHERE t.code='liyou-demo'
+		SELECT t.id, 'admin', $1, 'tenant_admin' FROM tenants t WHERE t.code='liyou'
 		ON CONFLICT (username) DO NOTHING`, adminHash); err != nil {
 		return fmt.Errorf("种子用户 admin 写入失败: %w", err)
 	}

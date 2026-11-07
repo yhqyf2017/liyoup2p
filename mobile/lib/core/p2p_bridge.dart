@@ -14,6 +14,7 @@ const bool kHideServerAddr = kReleaseMode && bool.fromEnvironment('RELEASE');
 const String kDefaultServerURL = 'http://jyly8888.gnway.vip:58894';
 
 const String _serverHost = 'jyly8888.gnway.vip:58894';
+const String _serverHostBare = 'jyly8888.gnway.vip';
 
 /// 正式包文本脱敏：把平台地址（http/https/ws/wss 前缀与裸域名形式）替换为「服务器」。
 /// [enabled] 供单测注入；默认随 [kHideServerAddr] 生效（调试构建原样保留）。
@@ -24,7 +25,8 @@ String sanitizeServerText(String text, {bool enabled = kHideServerAddr}) {
       .replaceAll('wss://$_serverHost', '服务器')
       .replaceAll('http://$_serverHost', '服务器')
       .replaceAll('ws://$_serverHost', '服务器')
-      .replaceAll(_serverHost, '服务器');
+      .replaceAll(_serverHost, '服务器')
+      .replaceAll(_serverHostBare, '服务器');
 }
 
 /// 日志条目。

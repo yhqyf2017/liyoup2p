@@ -29,7 +29,7 @@ class _LoginPageState extends State<LoginPage> {
   final _server = TextEditingController(
     text: 'http://jyly8888.gnway.vip:58894',
   );
-  final _tenant = TextEditingController();
+  final _tenant = TextEditingController(text: 'liyou');
   final _user = TextEditingController();
   final _pass = TextEditingController();
   final _devName = TextEditingController(text: 'Android设备');
@@ -48,7 +48,7 @@ class _LoginPageState extends State<LoginPage> {
     final p = await SharedPreferences.getInstance();
     if (!mounted) return;
     setState(() {
-      _tenant.text = p.getString('saved_tenant') ?? '';
+      _tenant.text = p.getString('saved_tenant') ?? 'liyou';
       _user.text = p.getString('saved_user') ?? '';
       _pass.text = p.getString('saved_pass') ?? '';
       _devName.text = p.getString('saved_devName') ?? 'Android设备';

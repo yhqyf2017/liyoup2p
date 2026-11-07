@@ -111,17 +111,20 @@ const redactedURL = "服务器"
 func releaseMode() bool { return isRelease == "true" }
 
 // serverSanitizer 平台地址替换表：前缀形式（https/wss/http/ws）在参数序上先于裸域名，
-// 保证带前缀的完整地址优先整体替换，不会出现「http://服务器」这类残缺形式。
+// 保证带前缀的完整地址优先整体替换，不会出现「http://服务器」这类残缺形式；
+// 末位兜底替换不带端口的裸域名（错误信息经 URL 解析后常只剩 host）。
 var serverSanitizer = newServerSanitizer()
 
 func newServerSanitizer() *strings.Replacer {
 	host := strings.TrimPrefix(strings.TrimPrefix(defaultPlatformURL, "https://"), "http://")
+	bare := strings.Split(host, ":")[0]
 	return strings.NewReplacer(
 		"https://"+host, redactedURL,
 		"wss://"+host, redactedURL,
 		"http://"+host, redactedURL,
 		"ws://"+host, redactedURL,
 		host, redactedURL,
+		bare, redactedURL,
 	)
 }
 

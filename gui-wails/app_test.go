@@ -56,6 +56,8 @@ func TestSanitizeServerText(t *testing.T) {
 		"平台 jyly8888.gnway.vip:58894 就绪",
 		"请求 https://jyly8888.gnway.vip:58894/api/auth/login 失败",
 		"wss://jyly8888.gnway.vip:58894/ws 已断开",
+		"dial tcp: lookup jyly8888.gnway.vip: no such host",
+		"信令主机 jyly8888.gnway.vip 连接超时",
 	} {
 		got := sanitizeServerText(in)
 		if strings.Contains(got, "jyly8888") || !strings.Contains(got, "服务器") {

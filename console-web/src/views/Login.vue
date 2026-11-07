@@ -76,7 +76,7 @@
             {{ loading ? '登录中…' : '登 录' }}
           </el-button>
         </el-form>
-        <div class="login-foot">默认租户 liyou-demo，如需平台管理请使用 platform</div>
+        <div class="login-foot">默认租户 liyou，如需平台管理请使用 platform</div>
       </div>
     </div>
   </div>
@@ -90,7 +90,7 @@ import { setAuth } from '../store'
 import Logo from '../components/Logo.vue'
 
 const router = useRouter()
-const form = reactive({ tenant: 'liyou-demo', username: '', password: '' })
+const form = reactive({ tenant: 'liyou', username: '', password: '' })
 const loading = ref(false)
 const errorMsg = ref('')
 
