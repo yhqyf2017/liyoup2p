@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"os/signal"
 	"syscall"
@@ -97,7 +98,7 @@ func main() {
 			break
 		}
 	}
-	mux.Handle("GET /", http.FileServer(http.Dir(consoleDir)))
+	mux.Handle("GET /", spaHandler(consoleDir))
 	log.Printf("[平台] 控制台目录：%s（浏览器打开 http://<平台IP>%s/）", consoleDir, cfg.HTTPAddr)
 
 	srv := &http.Server{Addr: cfg.HTTPAddr, Handler: mux}
@@ -112,4 +113,22 @@ func main() {
 		log.Fatalf("[平台] HTTP 服务异常：%v", err)
 	}
 	log.Printf("[平台] 已退出")
+}
+
+// spaHandler 控制台 SPA 托管：命中真实文件按文件返回（http.Dir.Open 自带路径穿越防护），
+// 其余一律回退 index.html——前端 history 路由（/devices 等）刷新不再 404。
+// /api、/ws、/relay、/update 均为更高优先级的独立路由，不受此兜底影响。
+func spaHandler(dir string) http.Handler {
+	fs := http.Dir(dir)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		f, err := fs.Open(path.Clean(r.URL.Path))
+		if err == nil {
+			defer f.Close()
+			if st, statErr := f.Stat(); statErr == nil && !st.IsDir() {
+				http.ServeFile(w, r, filepath.Join(string(fs), path.Clean(r.URL.Path)))
+				return
+			}
+		}
+		http.ServeFile(w, r, filepath.Join(string(fs), "index.html"))
+	})
 }
