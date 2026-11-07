@@ -1,4 +1,4 @@
-# 励联 P2P 平台启动脚本：读取 platform-go\.env 注入环境变量后构建并启动平台。
+﻿# 励联 P2P 平台启动脚本：读取 platform-go\.env 注入环境变量后构建并启动平台。
 # 用法：pwsh -ExecutionPolicy Bypass -File start-platform.ps1
 # 说明：
 #   - 凭据（数据库 DSN / JWT 密钥 / 种子账号密码）只放 .env，不进源码、不进命令行；
