@@ -137,24 +137,12 @@ class _MapPageState extends State<MapPage> {
       return;
     }
     // 危险操作二次确认：删除会立刻关闭运行中的连接入口
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('删除映射规则', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-        content: Text(
-          '${m.host.isEmpty ? "服务端本机" : m.host}:${m.remote} 的入口将被删除'
+    final ok = await confirmDanger(
+      context,
+      title: '删除映射规则',
+      message: '${m.host.isEmpty ? "服务端本机" : m.host}:${m.remote} 的入口将被删除'
           '${_running ? "，正在使用的连接会立即断开" : ""}。',
-          style: const TextStyle(fontSize: 14),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
+      confirmLabel: '删除',
     );
     if (ok != true || !mounted) return;
     if (_running) {

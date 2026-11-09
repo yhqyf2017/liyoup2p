@@ -10,6 +10,7 @@ import '../core/theme.dart';
 import '../core/update_service.dart';
 import '../models/map_rule.dart';
 import 'map_page.dart';
+import 'login_page.dart';
 import 'settings_page.dart';
 
 /// 客户端工作页：品牌渐变状态卡 + 映射规则入口 + 暗色日志块。
@@ -147,7 +148,15 @@ class _WorkPageState extends State<WorkPage> {
     }
   }
 
+  /// 平台返回 401（设备令牌无效/已过期）：提示并跳转登录页（仅触发一次）
+  static final _authFailRe = RegExp(r'\b401\b|令牌无效|令牌已失效|令牌已过期');
+  bool _authFailHandled = false;
+
   void _onLog(LogEntry e) {
+    if (!_preview && !_authFailHandled && _authFailRe.hasMatch(e.text)) {
+      _authFailHandled = true;
+      _handleAuthFail();
+    }
     _logBuffer.add(e);
     // 150ms 节流批量渲染，避免日志风暴冲爆 UI
     _logFlush ??= Timer(const Duration(milliseconds: 150), () {
@@ -245,6 +254,20 @@ class _WorkPageState extends State<WorkPage> {
   void _toast(String s, {ToastType type = ToastType.info}) =>
       showToast(context, s, type: type);
 
+  /// 登录失效统一处理：停止连接 → 清除会话 → 回登录页
+  Future<void> _handleAuthFail() async {
+    try {
+      await p2p.stop();
+      await p2p.setForeground(false, '');
+    } catch (_) {}
+    final p = await SharedPreferences.getInstance();
+    await p.remove('session');
+    if (!mounted) return;
+    showToast(context, '登录已失效，请重新登录', type: ToastType.error);
+    Navigator.of(context)
+        .pushReplacement(MaterialPageRoute(builder: (_) => const LoginPage()));
+  }
+
   /// 系统返回键：不退出应用，退到后台保持隧道存活，并给出提示。
   Future<void> _backToBackground() async {
     _toast('应用已进入后台运行，连接保持中', type: ToastType.success);
@@ -313,7 +336,7 @@ class _WorkPageState extends State<WorkPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(T.s16, T.s4, T.s16, 0),
+                    padding: const EdgeInsets.fromLTRB(T.s16, T.s16, T.s16, 0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [

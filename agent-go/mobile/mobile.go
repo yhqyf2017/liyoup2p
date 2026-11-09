@@ -193,7 +193,7 @@ func StartClient(deviceToken, platformWS, mapsJSON string) error {
 		Punch:       true,
 	}
 	logx.SetLabel("Agent·客户端")
-	logx.Infof("LiYou P2P Agent 启动：%s", cfg)
+	logx.Infof("励联 LiLink Agent 启动：%s", cfg)
 
 	ctx, c := context.WithCancel(context.Background())
 	w := ws.New(cfg.Platform, deviceToken)

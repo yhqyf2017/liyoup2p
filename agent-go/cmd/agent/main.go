@@ -21,7 +21,7 @@ import (
 func main() {
 	cfg := config.Load()
 	logx.SetLabel("Agent·初始化")
-	logx.Infof("LiYou P2P Agent 启动：%s", cfg)
+	logx.Infof("励联 LiLink Agent 启动：%s", cfg)
 
 	token, err := device.Resolve(cfg.DeviceToken, cfg.TokenFile)
 	if err != nil {

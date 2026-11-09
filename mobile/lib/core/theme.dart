@@ -303,6 +303,37 @@ abstract final class T {
 /// 浮层提示语义类型：决定图标与颜色
 enum ToastType { info, success, warn, error }
 
+/// 危险操作统一确认弹窗：标题 + 说明 + 取消 / 红色实心确认按钮。
+/// 删除规则、退出登录等破坏性操作共用，保证全局一致。
+Future<bool> confirmDanger(
+  BuildContext context, {
+  required String title,
+  required String message,
+  String confirmLabel = '删除',
+}) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(title),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          style: FilledButton.styleFrom(
+            backgroundColor: Theme.of(ctx).colorScheme.error,
+          ),
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: Text(confirmLabel),
+        ),
+      ],
+    ),
+  );
+  return ok == true;
+}
+
 /// 带图标的底部浮层提示（M3 SnackBar）：信息蓝 / 成功绿 / 警告琥珀 / 错误红。
 /// 全 App 统一入口，样式由 snackBarTheme 控制。
 void showToast(
