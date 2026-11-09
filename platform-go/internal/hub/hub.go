@@ -176,19 +176,44 @@ func (h *Hub) Kick(deviceID int64) {
 
 func (h *Hub) register(c *Conn) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
 	if old := h.conns[c.device.ID]; old != nil {
 		old.closed = true
 		old.ws.Close()
 	}
 	c.hub.conns[c.device.ID] = c
+	// 旧连接被顶替（如客户端异常退出后重新登录）：旧连接名下的待处理请求与
+	// 会话在此一并作废。必须锁内同步清理——旧连接读循环随后触发的 unregister
+	// 会因「非当前连接」直接返回，若在此漏清，新连接刚建立的会话会被误删，
+	// 导致 punch_offer 转发失败（打洞必败）与中继凭证无法下发（兜底也超时）。
+	var affected []*sessionState
+	for id, pr := range h.pending {
+		if pr.ClientID == c.device.ID || pr.ServerID == c.device.ID {
+			delete(h.pending, id)
+		}
+	}
+	for id, s := range h.sessions {
+		if s.ClientID == c.device.ID || s.ServerID == c.device.ID {
+			affected = append(affected, s)
+			delete(h.sessions, id)
+		}
+	}
+	h.mu.Unlock()
+	for _, s := range affected {
+		h.notifyPeerClosed(s, c.device.ID, "对端重新上线，旧会话已作废")
+		h.endSession(s, c.device.DeviceUID, "设备重新上线，旧会话作废")
+	}
 }
 
 func (h *Hub) unregister(c *Conn) {
 	h.mu.Lock()
-	if cur := h.conns[c.device.ID]; cur == c {
-		delete(h.conns, c.device.ID)
+	// 仅当前连接有权清理设备状态：被新连接顶替的旧连接（异常退出后重登录）
+	// 直接返回，否则会误删新连接正在建立的会话，造成打洞失败回落中继且
+	// 中继凭证无法下发的连锁故障。
+	if cur := h.conns[c.device.ID]; cur != c {
+		h.mu.Unlock()
+		return
 	}
+	delete(h.conns, c.device.ID)
 	// 清理该设备相关的待处理请求
 	for id, pr := range h.pending {
 		if pr.ClientID == c.device.ID || pr.ServerID == c.device.ID {
@@ -211,6 +236,7 @@ func (h *Hub) unregister(c *Conn) {
 	}}, c.device.ID)
 	log.Printf("[信令] 设备下线 %s(%s)", c.device.Name, c.device.DeviceUID)
 	for _, s := range affected {
+		h.notifyPeerClosed(s, c.device.ID, "对端已断线，会话关闭")
 		h.endSession(s, c.device.DeviceUID, "设备断开连接")
 	}
 	c.close()
@@ -548,6 +574,19 @@ func (h *Hub) endSession(sess *sessionState, actorUID, reason string) {
 		Detail: fmt.Sprintf("会话 %s 关闭（端口 %d，%s）：%s", sess.ID, sess.Port, modeLabel(sess.Mode), reason),
 	})
 	log.Printf("[信令] 会话结束 %s：%s", sess.ID, reason)
+}
+
+// notifyPeerClosed 平台强制结束会话时立刻通知存活的对端拆除旧会话。
+// 否则对端可靠通道会空转重传 30 秒：既浪费流量，其持续外发流量还会
+// 把对端 NAT 中本会话的陈旧映射条目钉住，干扰下一轮会话的首轮打洞。
+func (h *Hub) notifyPeerClosed(s *sessionState, closedDeviceID int64, reason string) {
+	peerID := s.ClientID
+	if closedDeviceID == s.ClientID {
+		peerID = s.ServerID
+	}
+	if peer := h.connOf(peerID); peer != nil {
+		peer.send(frame{Type: "session_close", Data: map[string]any{"session_id": s.ID, "reason": reason}})
+	}
 }
 
 // ---------- 工具 ----------

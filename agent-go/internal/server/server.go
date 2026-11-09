@@ -12,6 +12,7 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"os"
@@ -29,6 +30,9 @@ import (
 )
 
 const handshakeWait = 10 * time.Second // 等待复用协商魔数/旧版首帧的时长
+
+// 中继 → P2P 直连自动升级轮次基线（与客户端 upgradeRoundBase 一致）。
+const upgradeRoundBase = 1000
 
 // Server 服务端角色。
 type Server struct {
@@ -49,16 +53,23 @@ type session struct {
 	key       [32]byte
 	mode      string // p2p | relay（由平台核准结果决定）
 
-	offerCh  chan []string
+	offerCh  chan punchOffer
 	grantCh  chan grantInfo
-	resultCh chan bool
+	resultCh chan punchResult
 	startCh  chan struct{}
 
 	udp     *net.UDPConn
 	udpPeer *net.UDPAddr
 	relay   net.Conn
 	target  net.Conn
-	mux     *smux.Session // 复用模式下的会话
+
+	muxMu sync.Mutex    // 保护 mux（升级替换时并发读写）
+	mux   *smux.Session // 复用模式下的会话（升级后替换为新直连会话）
+
+	upMu     sync.Mutex   // 保护升级打洞套接字
+	upUDP    *net.UDPConn // 升级打洞成功的新套接字（等待 path_upgrade 帧消费）
+	upPeer   *net.UDPAddr
+	upgraded atomic.Bool // 已完成中继→直连升级
 
 	// 旧版降级：UDP 协商期间收到的对端首帧
 	pendType    byte
@@ -71,8 +82,11 @@ type session struct {
 
 func (s *session) closeAll() {
 	s.once.Do(func() { close(s.done) })
-	if s.mux != nil {
-		s.mux.Close()
+	if m := s.takeMuxSession(); m != nil {
+		m.Close()
+	}
+	if udp, _ := s.takeUpgradeConn(); udp != nil {
+		udp.Close()
 	}
 	if s.udp != nil {
 		s.udp.Close()
@@ -83,6 +97,50 @@ func (s *session) closeAll() {
 	if s.target != nil {
 		s.target.Close()
 	}
+}
+
+// setMuxSession 原子设置当前复用会话，返回被替换的旧会话（供延迟回收）。
+func (s *session) setMuxSession(m *smux.Session) *smux.Session {
+	s.muxMu.Lock()
+	defer s.muxMu.Unlock()
+	old := s.mux
+	s.mux = m
+	return old
+}
+
+// currentMuxSession 当前复用会话。
+func (s *session) currentMuxSession() *smux.Session {
+	s.muxMu.Lock()
+	defer s.muxMu.Unlock()
+	return s.mux
+}
+
+// takeMuxSession 取走并清空当前复用会话。
+func (s *session) takeMuxSession() *smux.Session {
+	s.muxMu.Lock()
+	defer s.muxMu.Unlock()
+	m := s.mux
+	s.mux = nil
+	return m
+}
+
+// setUpgradeConn 记录升级打洞成功的新套接字（替换旧记录并关闭其套接字）。
+func (s *session) setUpgradeConn(udp *net.UDPConn, peer *net.UDPAddr) {
+	s.upMu.Lock()
+	defer s.upMu.Unlock()
+	if s.upUDP != nil && s.upUDP != udp {
+		s.upUDP.Close()
+	}
+	s.upUDP, s.upPeer = udp, peer
+}
+
+// takeUpgradeConn 取走升级套接字（所有权移交消费方）。
+func (s *session) takeUpgradeConn() (*net.UDPConn, *net.UDPAddr) {
+	s.upMu.Lock()
+	defer s.upMu.Unlock()
+	udp, peer := s.upUDP, s.upPeer
+	s.upUDP, s.upPeer = nil, nil
+	return udp, peer
 }
 
 type grantInfo struct {
@@ -137,6 +195,11 @@ func (s *Server) onFrame(f ws.Frame) {
 			s.remove(sid)
 			sess.closeAll()
 		}
+	case "path_upgrade":
+		sid, _ := f.Data["session_id"].(string)
+		if sess := s.getByID(sid); sess != nil {
+			go s.onPathUpgrade(sess)
+		}
 	case "relay_grant":
 		sid, _ := f.Data["session_id"].(string)
 		if sess := s.getByID(sid); sess != nil {
@@ -150,8 +213,12 @@ func (s *Server) onFrame(f ws.Frame) {
 	case "punch_offer":
 		sid, _ := f.Data["session_id"].(string)
 		if sess := s.getByID(sid); sess != nil {
+			round := 0
+			if r, ok := f.Data["round"].(float64); ok {
+				round = int(r)
+			}
 			select {
-			case sess.offerCh <- punch.ParseCandidates(f.Data):
+			case sess.offerCh <- punchOffer{cands: punch.ParseCandidates(f.Data), round: round}:
 			default:
 			}
 		}
@@ -159,8 +226,12 @@ func (s *Server) onFrame(f ws.Frame) {
 		sid, _ := f.Data["session_id"].(string)
 		if sess := s.getByID(sid); sess != nil {
 			ok, _ := f.Data["success"].(bool)
+			round := 0
+			if r, okr := f.Data["round"].(float64); okr {
+				round = int(r)
+			}
 			select {
-			case sess.resultCh <- ok:
+			case sess.resultCh <- punchResult{ok: ok, round: round}:
 			default:
 			}
 		}
@@ -207,9 +278,9 @@ func (s *Server) onSessionRequest(data map[string]any) {
 		port:      port,
 		peer:      peer,
 		mode:      mode, // 本端偏好；session_start 以平台核准为准
-		offerCh:   make(chan []string, 4),
+		offerCh:   make(chan punchOffer, 4),
 		grantCh:   make(chan grantInfo, 4),
-		resultCh:  make(chan bool, 4),
+		resultCh:  make(chan punchResult, 4),
 		startCh:   make(chan struct{}),
 		done:      make(chan struct{}),
 	}
@@ -317,6 +388,7 @@ func (s *Server) runSession(sess *session) {
 		if isMux {
 			muxSess = ms
 			sess.relay = nil // 所有权移交复用会话
+			go s.upgradeResponder(sess)
 		} else {
 			streamR = raw
 		}
@@ -366,18 +438,152 @@ func (s *Server) udpHandshake(sess *session) (path string, mux bool, err error) 
 
 // runMux 复用模式：接受子流，按子流首帧的目标端口连接本地服务并双向转发。
 func (s *Server) runMux(sess *session, muxSess *smux.Session, path string) {
-	sess.mux = muxSess
+	sess.setMuxSession(muxSess)
 	logx.Infof("持久隧道已建立：会话 %s 路径=%s 多路复用就绪（子流按需开合，无需平台逐条核准）", sess.id, path)
 	s.ws.Send("mux_ready", map[string]any{"session_id": sess.id, "mode": "mux"})
+	s.acceptMux(sess, muxSess, path)
+}
+
+// acceptMux 复用会话子流接受循环；升级替换旧会话时静默退出，否则断开时通知平台。
+func (s *Server) acceptMux(sess *session, muxSess *smux.Session, path string) {
 	for {
 		stream, err := muxSess.AcceptStream()
 		if err != nil {
+			if sess.currentMuxSession() != muxSess {
+				return // 已被直连升级路径替换，旧会话静默退出（生命周期归新会话）
+			}
 			logx.Infof("会话 %s：持久隧道断开（路径=%s）：%v", sess.id, path, err)
 			break
 		}
 		go s.serveStream(sess, stream)
 	}
 	s.ws.Send("session_close", map[string]any{"session_id": sess.id, "reason": "持久隧道断开"})
+}
+
+// upgradeResponder 中继隧道升级应答端：响应客户端升级轮次（round≥1000）的打洞
+// 候选，协同打洞并保存可用套接字，等待客户端 path_upgrade 帧完成迁移。
+func (s *Server) upgradeResponder(sess *session) {
+	for {
+		select {
+		case <-sess.done:
+			return
+		case po := <-sess.offerCh:
+			if po.round < upgradeRoundBase {
+				continue
+			}
+			if sess.upgraded.Load() {
+				return
+			}
+			if m := sess.currentMuxSession(); m == nil || m.IsClosed() {
+				return // 隧道已断开，升级无意义
+			}
+			s.upgradeRound(sess, po.round, po.cands)
+		}
+	}
+}
+
+// upgradeRound 单轮升级打洞：随机端口 + STUN 候选（热映射）→ 先回候选让对端
+// 同步开打 → 本端协同打洞 → 双端确认后暂存套接字待迁移。
+func (s *Server) upgradeRound(sess *session, round int, cands []string) {
+	udp, err := punch.RandomPortConn()
+	if err != nil {
+		return
+	}
+	tunnel.SetUDPBuffer(udp, nil)
+	cands2 := punch.BuildCandidates(udp, nil)
+	s.ws.Send("punch_offer", map[string]any{"session_id": sess.id, "candidates": cands2, "round": round})
+
+	targets := punch.ResolveTargets(cands, nil)
+	peer, perr := punch.Punch(udp, targets, 5*time.Second, sess.key, nil)
+	mineOK := perr == nil
+	if mineOK {
+		sess.setUpgradeConn(udp, peer) // 先落套接字再回报结果，避免 path_upgrade 抢先到达扑空
+		logx.Infof("会话 %s：直连升级轮次 %d：服务端打洞成功，已暂存直连套接字等待迁移", sess.id, round)
+	} else {
+		udp.Close()
+		logx.Infof("会话 %s：直连升级轮次 %d：服务端打洞未成功", sess.id, round)
+	}
+	s.ws.Send("punch_result", map[string]any{"session_id": sess.id, "success": mineOK, "round": round})
+}
+
+// onPathUpgrade 处理客户端直连升级请求：在升级套接字上完成魔数就绪握手，
+// 建立可靠层与 smux 服务端，接管子流接受；旧中继会话延迟回收（子流不中断）。
+func (s *Server) onPathUpgrade(sess *session) {
+	if sess.upgraded.Load() {
+		return
+	}
+	udp, peer := sess.takeUpgradeConn()
+	if udp == nil {
+		logx.Warnf("会话 %s：收到直连升级请求，但暂无可用的直连套接字（等待下一轮升级尝试）", sess.id)
+		return
+	}
+	peer, err := upgradeMagicAccept(udp, peer, sess.key)
+	if err != nil {
+		udp.Close()
+		logx.Warnf("会话 %s：直连升级协商失败：%v", sess.id, err)
+		return
+	}
+	raw := reliable.New(udp, peer, sess.key)
+	muxSess, err := smux.Server(raw, muxlink.Config())
+	if err != nil {
+		raw.Close()
+		logx.Errorf("会话 %s：升级后的复用会话建立失败：%v", sess.id, err)
+		return
+	}
+	sess.upgraded.Store(true)
+	old := sess.setMuxSession(muxSess)
+	retireMuxSession(old)
+	go s.acceptMux(sess, muxSess, "P2P直连")
+	logx.Infof("会话 %s：中继隧道已升级为 P2P 直连（原地迁移，业务子流不中断）", sess.id)
+}
+
+// upgradeMagicAccept 升级魔数就绪握手：等待客户端魔数并回显（客户端持续重发
+// 消化时序竞争），返回魔数实际来源地址。
+func upgradeMagicAccept(udp *net.UDPConn, expect *net.UDPAddr, key [32]byte) (*net.UDPAddr, error) {
+	_ = udp.SetReadDeadline(time.Now().Add(15 * time.Second))
+	defer udp.SetReadDeadline(time.Time{})
+	buf := make([]byte, 128)
+	var from *net.UDPAddr
+	for {
+		n, f, err := udp.ReadFromUDP(buf)
+		if err != nil {
+			return nil, errors.New("等待直连升级魔数超时")
+		}
+		if f != nil {
+			from = f
+		}
+		if plain, derr := tunnel.Open(key, buf[:n]); derr == nil && muxlink.IsMagic(plain) {
+			if from == nil {
+				from = expect
+			}
+			if from != nil {
+				_, _ = udp.WriteToUDP(muxlink.SealMagic(key), from)
+			}
+			return from, nil
+		}
+		// 打洞残留探测等非法报文，忽略
+	}
+}
+
+// retireMuxSession 被替换的旧复用会话延迟回收：子流全部排空或超时后关闭
+// （旧 accept 循环随之退出且不触发会话关闭通知）。
+func retireMuxSession(old *smux.Session) {
+	if old == nil || old.IsClosed() {
+		return
+	}
+	go func() {
+		deadline := time.Now().Add(120 * time.Second)
+		for time.Now().Before(deadline) {
+			if old.IsClosed() {
+				return
+			}
+			if old.NumStreams() == 0 {
+				break
+			}
+			time.Sleep(time.Second)
+		}
+		old.Close()
+	}()
 }
 
 // maxStreamHostLen 子流首帧目标主机最大长度。
@@ -485,55 +691,151 @@ func (s *Server) runLegacy(sess *session, streamR io.Reader, path string) {
 	s.pumpTargetToTunnel(sess)
 }
 
+// punchOffer 对端打洞候选（round=0 表示旧版对端未带轮次标记）。
+type punchOffer struct {
+	cands []string
+	round int
+}
+
+// punchResult 对端打洞结果（round=0 表示旧版对端未带轮次标记）。
+type punchResult struct {
+	ok    bool
+	round int
+}
+
+// punchPrefetch 预取的打洞套接字（映射在第 2 轮开打前才探测，保持热映射）。
+type punchPrefetch struct {
+	conn *net.UDPConn
+}
+
+// punchRounds 打洞轮数：首轮失败后更换套接字重建映射并协同重试一轮，
+// 消化重连风暴下的瞬态 NAT/防火墙抖动（对端失败时同样会重发候选）。
+const punchRounds = 2
+
 // setupP2P 建立 UDP 直连；失败时释放 UDP 套接字，确保后续走中继。
 func (s *Server) setupP2P(sess *session) (ok bool) {
+	// 预取备用套接字：只建套接字不做 STUN——映射必须等到第 2 轮开打前
+	// 才探测，保持「STUN 后立即打洞」的热映射时序（1.0.8 曾把 STUN 提前，
+	// 映射闲置 1-3 秒被 NAT 回收，导致第 2 轮打洞失败回落中继）。
+	preCh := make(chan *punchPrefetch, 1)
+	go func() {
+		sock, err := punch.RandomPortConn()
+		if err != nil {
+			preCh <- nil
+			return
+		}
+		tunnel.SetUDPBuffer(sock, logx.Infof)
+		preCh <- &punchPrefetch{conn: sock}
+	}()
 	defer func() {
 		if !ok && sess.udp != nil {
 			sess.udp.Close()
 			sess.udp = nil
 		}
+		select {
+		case p := <-preCh:
+			if p != nil && p.conn != sess.udp {
+				p.conn.Close()
+			}
+		default:
+		}
 	}()
-	udp, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4zero})
-	if err != nil {
-		logx.Errorf("会话 %s：创建 UDP 套接字失败：%v", sess.id, err)
-		return false
-	}
-	tunnel.SetUDPBuffer(udp, logx.Infof)
-	sess.udp = udp
-	cands := punch.BuildCandidates(udp, logx.Infof)
-	logx.Infof("会话 %s：本端候选已就绪（共 %d 个），等待对端候选", sess.id, len(cands))
-	s.ws.Send("punch_offer", map[string]any{"session_id": sess.id, "candidates": cands})
 
-	var peerCands []string
-	select {
-	case peerCands = <-sess.offerCh:
-	case <-time.After(5 * time.Second):
-		logx.Warnf("会话 %s：等待对端候选超时", sess.id)
-		return false
-	}
-	logx.Infof("会话 %s：已获对端候选", sess.id)
-	targets := punch.ResolveTargets(peerCands, logx.Infof)
-	if len(targets) == 0 {
-		logx.Warnf("会话 %s：对端候选均不可用", sess.id)
-		return false
-	}
-	peer, err := punch.Punch(udp, targets, 3*time.Second, sess.key, logx.Infof)
-	mineOK := err == nil
-	s.ws.Send("punch_result", map[string]any{"session_id": sess.id, "success": mineOK})
-	if !mineOK {
-		logx.Warnf("会话 %s：%v", sess.id, err)
-		return false
-	}
-	select {
-	case peerOK := <-sess.resultCh:
-		if peerOK {
+roundLoop:
+	for round := 1; round <= punchRounds; round++ {
+		var udp *net.UDPConn
+		var cands []string
+		reused := false
+		if round > 1 {
+			select {
+			case p := <-preCh:
+				if p != nil {
+					logx.Infof("会话 %s：第 %d 轮打洞（复用预取套接字）", sess.id, round)
+					udp = p.conn
+					cands = punch.BuildCandidates(udp, logx.Infof)
+					reused = true
+				}
+			default:
+			}
+		}
+		if !reused {
+			if round > 1 {
+				logx.Infof("会话 %s：第 %d 轮打洞（更换套接字重建映射）", sess.id, round)
+			}
+			var err error
+			udp, err = punch.RandomPortConn()
+			if err != nil {
+				logx.Errorf("会话 %s：创建 UDP 套接字失败：%v", sess.id, err)
+				return false
+			}
+			tunnel.SetUDPBuffer(udp, logx.Infof)
+			cands = punch.BuildCandidates(udp, logx.Infof)
+		}
+		sess.udp = udp
+
+		logx.Infof("会话 %s：第 %d 轮本端候选已就绪（共 %d 个），等待对端候选", sess.id, round, len(cands))
+		s.ws.Send("punch_offer", map[string]any{"session_id": sess.id, "candidates": cands, "round": round})
+
+		var po punchOffer
+	getOffer:
+		for {
+			select {
+			case po = <-sess.offerCh:
+				if po.round == 0 || po.round == round {
+					logx.Infof("会话 %s：已获对端候选（第 %d 轮）", sess.id, po.round)
+					break getOffer
+				}
+			case <-time.After(5 * time.Second):
+				logx.Warnf("会话 %s：第 %d 轮等待对端候选超时", sess.id, round)
+				continue roundLoop
+			}
+		}
+		targets := punch.ResolveTargets(po.cands, logx.Infof)
+		if len(targets) == 0 {
+			logx.Warnf("会话 %s：对端候选均不可用，无法打洞", sess.id)
+			continue roundLoop
+		}
+		peer, perr := punch.Punch(udp, targets, 3*time.Second, sess.key, logx.Infof)
+		mineOK := perr == nil
+		if !mineOK {
+			logx.Warnf("会话 %s：第 %d 轮 %v", sess.id, round, perr)
+		}
+		s.ws.Send("punch_result", map[string]any{"session_id": sess.id, "success": mineOK, "round": round})
+
+		peerOK := false
+		if mineOK {
+			// 本端已通，等对端结果确认；跨轮次的陈旧结果直接丢弃
+		waitPeer:
+			for {
+				select {
+				case pr := <-sess.resultCh:
+					if pr.round == 0 || pr.round == round {
+						peerOK = pr.ok
+						break waitPeer
+					}
+				case <-time.After(5 * time.Second):
+					logx.Warnf("会话 %s：第 %d 轮等待对端打洞结果超时", sess.id, round)
+					break waitPeer
+				}
+			}
+		} else {
+			// 本端失败：短暂对齐对端节奏；双端同码下对端失败同样会重发候选
+			select {
+			case <-sess.resultCh:
+			case <-time.After(2 * time.Second):
+			}
+		}
+		if mineOK && peerOK {
 			sess.udpPeer = peer
-			logx.Infof("会话 %s：UDP 直连已建立（%s）", sess.id, punch.PathLabel(peer))
+			logx.Infof("会话 %s：UDP 直连已建立（%s，第 %d 轮）", sess.id, punch.PathLabel(peer), round)
 			return true
 		}
-	case <-time.After(5 * time.Second):
+		if round < punchRounds {
+			logx.Warnf("会话 %s：第 %d 轮打洞未成功（本端=%v 对端=%v），更换套接字重试", sess.id, round, mineOK, peerOK)
+		} else {
+			logx.Warnf("会话 %s：打洞重试后仍未成功，准备回落中继", sess.id)
+		}
 	}
-	logx.Warnf("会话 %s：对端打洞未成功，准备回落中继", sess.id)
 	return false
 }
 

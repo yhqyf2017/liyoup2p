@@ -7,6 +7,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"fmt"
+	"math/rand"
 	"net"
 	"sort"
 	"strings"
@@ -24,6 +25,23 @@ const graceWindow = 400 * time.Millisecond
 
 // StunServers 公网映射探测服务器（可用服务器会缓存，优先复用）。
 var StunServers = stun.DefaultServers
+
+// RandomPortConn 创建绑定随机高端口（30000-59999）的 UDP 套接字。
+// 快速重连场景下 OS 顺序分配的临时端口容易与刚失效会话的 NAT 映射端口撞车：
+// 路由器中未过期的旧映射条目会把入站探测阴影到已死套接字，造成首轮打洞双向黑洞。
+// 随机高端口几乎不会命中近期用过的外部映射端口。
+func RandomPortConn() (*net.UDPConn, error) {
+	var lastErr error
+	for i := 0; i < 5; i++ {
+		port := 30000 + rand.Intn(30000)
+		udp, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.IPv4zero, Port: port})
+		if err == nil {
+			return udp, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
 
 // BuildCandidates 组装本端打洞候选：各网卡私网地址优先，其后 STUN 公网映射（若可得）。
 // 映射按套接字生成，因此必须在传入的打洞套接字上探测。
@@ -144,7 +162,11 @@ func Punch(conn *net.UDPConn, targets []*net.UDPAddr, window time.Duration, key 
 		logf = func(string, ...any) {}
 	}
 	targets = SortTargets(targets)
-	logf("打洞目标已就绪（共 %d 个，内网优先）", len(targets))
+	addrs := make([]string, len(targets))
+	for i, t := range targets {
+		addrs[i] = t.String()
+	}
+	logf("打洞目标已就绪（共 %d 个，内网优先）：%s", len(targets), strings.Join(addrs, " "))
 	deadline := time.Now().Add(window)
 	buf := make([]byte, 128)
 	probe := probePacket(key)

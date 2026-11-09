@@ -27,8 +27,7 @@ const (
 	recvBufMax  = 8 << 20         // 接收缓冲上限（须大于发送窗口在途字节量，否则满弃→死锁）
 	rtoBase     = 300 * time.Millisecond
 	rtoMax      = 3 * time.Second
-	maxTries    = 25 // 单段最大重传次数（指数退避下约 30s 判死）
-	deadAfter   = 30 * time.Second // 有在途段但毫无确认进展的判死时长
+	deadAfter   = 30 * time.Second // 连续 30s 收不到对端任何合法报文才判死（路径级失联）
 	retransTick = 80 * time.Millisecond
 	fastResendMax = 64 // 快速重传单轮批量补段上限
 	rttAlphaNum, rttAlphaDen = 1, 8 // RTT 平滑系数 1/8（EWMA）
@@ -61,7 +60,8 @@ type Conn struct {
 	sock udpSock
 	key  [32]byte
 
-	peer atomic.Pointer[net.UDPAddr]
+	peer   atomic.Pointer[net.UDPAddr]
+	lastRx atomic.Int64 // 最近一次收到对端合法报文的 UnixNano：判死依据（路径级失联检测）
 
 	die      chan struct{}
 	dieOnce  sync.Once
@@ -113,6 +113,7 @@ func New(sock udpSock, peer *net.UDPAddr, key [32]byte) *Conn {
 		windowCh:     make(chan struct{}, 1),
 	}
 	c.peer.Store(peer)
+	c.lastRx.Store(time.Now().UnixNano())
 	go c.recvLoop()
 	go c.retransmitLoop()
 	return c
@@ -355,26 +356,28 @@ func (c *Conn) retransmitLoop() {
 			continue
 		}
 		now := time.Now()
-		if now.Sub(c.lastProgress) > deadAfter {
+		// 判死只看路径级失联：连续 deadAfter 未收到对端任何合法报文（含重复 ACK）。
+		// 仍有报文往来但确认无进展，说明对端可达只是背压（如接收缓冲满、应用暂不读取），
+		// 此时持续重传保活，绝不杀隧道（修复：接收端应用停读 >30s 被误判死）。
+		if rxIdle := now.Sub(time.Unix(0, c.lastRx.Load())); rxIdle > deadAfter {
 			inflight := len(c.outbuf)
 			w := c.win
 			rtt := c.srtt
 			var oldestSeq uint32
 			var oldestAge time.Duration
 			for _, s := range c.outbuf {
-				if age := now.Sub(s.lastSend); oldestSeq == 0 || s.seq < oldestSeq {
+				if oldestSeq == 0 || s.seq < oldestSeq {
 					oldestSeq = s.seq
-					oldestAge = age
+					oldestAge = now.Sub(s.lastSend)
 				}
 			}
 			c.wmu.Unlock()
-			logx.Errorf("可靠通道判死：在途 %d 段 win=%d srtt=%v 最老段 seq=%d 距上次发送 %v（%v 无确认进展）",
-				inflight, w, rtt, oldestSeq, oldestAge, deadAfter)
-			c.shutdown(errors.New("对端持续无确认，可靠通道判死"))
+			logx.Errorf("可靠通道判死：在途 %d 段 win=%d srtt=%v 最老段 seq=%d 距上次发送 %v（%v 未收到对端任何报文）",
+				inflight, w, rtt, oldestSeq, oldestAge, rxIdle)
+			c.shutdown(errors.New("对端持续无响应，可靠通道判死"))
 			return
 		}
 		resend := false
-		dead := false
 		var expired []*segment
 		for _, s := range c.outbuf {
 			if now.Sub(s.lastSend) < c.rto {
@@ -382,17 +385,8 @@ func (c *Conn) retransmitLoop() {
 			}
 			s.tries++
 			s.lastSend = now
-			if s.tries > maxTries {
-				dead = true
-				break
-			}
 			resend = true
 			expired = append(expired, s)
-		}
-		if dead {
-			c.wmu.Unlock()
-			c.shutdown(errors.New("重传超限，可靠通道判死"))
-			return
 		}
 		if resend {
 			c.rto *= 2
@@ -417,7 +411,6 @@ func (c *Conn) processAck(ack uint32) {
 	var fast []*segment
 	var newestSeq uint32 // 本批 ACK 覆盖的最大序号（最新发出段）
 	var rttSample time.Duration
-	dead := false
 	c.wmu.Lock()
 	progressed := false
 	now := time.Now()
@@ -473,10 +466,6 @@ func (c *Conn) processAck(ack uint32) {
 					break // 连续区段结束
 				}
 				s.tries++
-				if s.tries > maxTries {
-					dead = true
-					break
-				}
 				s.lastSend = now
 				fast = append(fast, s)
 			}
@@ -485,10 +474,6 @@ func (c *Conn) processAck(ack uint32) {
 	c.wmu.Unlock()
 	if progressed {
 		c.notify(c.windowCh)
-	}
-	if dead {
-		c.shutdown(errors.New("重传超限，可靠通道判死"))
-		return
 	}
 	for _, s := range fast {
 		c.transmit(s)
@@ -554,6 +539,7 @@ func (c *Conn) recvLoop() {
 		if derr != nil || len(plain) < headerSize {
 			continue // 打洞残留探测等非法报文，静默丢弃
 		}
+		c.lastRx.Store(time.Now().UnixNano())
 		seq := binary.BigEndian.Uint32(plain[0:4])
 		flags := binary.BigEndian.Uint16(plain[4:6])
 		plen := int(binary.BigEndian.Uint16(plain[6:8]))
