@@ -33,11 +33,11 @@ func BuildCandidates(conn *net.UDPConn, logf func(string, ...any)) []string {
 	}
 	port := conn.LocalAddr().(*net.UDPAddr).Port
 	out := localCandidates(port)
-	if pub, server, err := stun.Discover(conn, StunServers, 2*time.Second); err == nil {
-		logf("STUN 公网映射 %s（经由 %s）", pub, server)
+	if pub, _, err := stun.Discover(conn, StunServers, 2*time.Second); err == nil {
+		logf("STUN 公网探测完成，已取得公网映射候选")
 		out = append(out, pub.String())
 	} else {
-		logf("STUN 未获公网映射（%v），仅用私网候选", err)
+		logf("STUN 公网探测未成功，仅用内网候选")
 	}
 	return out
 }
@@ -70,7 +70,7 @@ func ResolveTargets(cands []string, logf func(string, ...any)) []*net.UDPAddr {
 		addr, err := net.ResolveUDPAddr("udp", c)
 		if err != nil {
 			if logf != nil {
-				logf("候选 %s 解析失败：%v", c, err)
+				logf("部分候选地址解析失败，已跳过")
 			}
 			continue
 		}
@@ -144,7 +144,7 @@ func Punch(conn *net.UDPConn, targets []*net.UDPAddr, window time.Duration, key 
 		logf = func(string, ...any) {}
 	}
 	targets = SortTargets(targets)
-	logf("打洞目标（内网优先排序）：%s", joinAddrs(targets))
+	logf("打洞目标已就绪（共 %d 个，内网优先）", len(targets))
 	deadline := time.Now().Add(window)
 	buf := make([]byte, 128)
 	probe := probePacket(key)
@@ -166,20 +166,20 @@ func Punch(conn *net.UDPConn, targets []*net.UDPAddr, window time.Duration, key 
 			if isPrivate(from.IP) {
 				// 高优先级路径（对端私网地址）确认，立即选定
 				_ = conn.SetReadDeadline(time.Time{})
-				logf("收到对端探测 %s，UDP 通路确认（选定路径）", from)
+				logf("收到对端内网探测，UDP 通路确认（选定路径）")
 				return from, nil
 			}
 			if publicPath == nil {
 				publicPath = from
 				graceEnd = time.Now().Add(graceWindow)
-				logf("收到对端公网探测 %s，宽限 %s 等待内网路径确认", from, graceWindow)
+				logf("收到对端公网探测，宽限 %s 等待内网路径确认", graceWindow)
 			}
 			continue
 		}
 		if publicPath != nil && !time.Now().Before(graceEnd) {
 			// 宽限窗内未等到内网确认（跨网络场景），回落公网直连
 			_ = conn.SetReadDeadline(time.Time{})
-			logf("宽限窗内未收到内网路径确认，选定公网路径 %s", publicPath)
+			logf("宽限窗内未收到内网路径确认，选定公网直连")
 			return publicPath, nil
 		}
 		for _, t := range targets {
@@ -191,13 +191,13 @@ func Punch(conn *net.UDPConn, targets []*net.UDPAddr, window time.Duration, key 
 	if publicPath != nil {
 		// 打洞窗口耗尽时已有公网路径确认，直接采用
 		_ = conn.SetReadDeadline(time.Time{})
-		logf("打洞窗口结束前仅有公网路径确认，选定 %s", publicPath)
+		logf("打洞窗口结束前仅有公网路径确认，选定公网直连")
 		return publicPath, nil
 	}
 	if lastErr != nil {
 		return nil, fmt.Errorf("UDP 打洞失败: %w", lastErr)
 	}
-	return nil, fmt.Errorf("UDP 打洞窗口超时，未收到对端探测（目标 %s）", joinAddrs(targets))
+	return nil, fmt.Errorf("UDP 打洞窗口超时，未收到对端探测")
 }
 
 // localCandidates 枚举本机各网卡的私网 IPv4 地址（排除回环与链路本地）。
@@ -258,10 +258,3 @@ func isPrivate(ip net.IP) bool {
 	return ip.IsPrivate()
 }
 
-func joinAddrs(targets []*net.UDPAddr) string {
-	parts := make([]string, 0, len(targets))
-	for _, t := range targets {
-		parts = append(parts, t.String())
-	}
-	return strings.Join(parts, ", ")
-}

@@ -816,7 +816,7 @@ func (c *Client) setupP2P(sess *session) (ok bool) {
 	tunnel.SetUDPBuffer(udp, logx.Infof)
 	sess.udp = udp
 	cands := punch.BuildCandidates(udp, logx.Infof)
-	logx.Infof("会话 %s：本端候选 %v，等待对端候选", sess.id, cands)
+	logx.Infof("会话 %s：本端候选已就绪（共 %d 个），等待对端候选", sess.id, len(cands))
 	c.ws.Send("punch_offer", map[string]any{"session_id": sess.id, "candidates": cands})
 
 	var peerCands []string
@@ -826,7 +826,7 @@ func (c *Client) setupP2P(sess *session) (ok bool) {
 		logx.Warnf("会话 %s：等待对端候选超时", sess.id)
 		return false
 	}
-	logx.Infof("会话 %s：打洞目标 %v", sess.id, peerCands)
+	logx.Infof("会话 %s：已获对端候选", sess.id)
 	targets := punch.ResolveTargets(peerCands, logx.Infof)
 	if len(targets) == 0 {
 		logx.Warnf("会话 %s：对端候选均不可用", sess.id)
@@ -843,7 +843,7 @@ func (c *Client) setupP2P(sess *session) (ok bool) {
 	case peerOK := <-sess.resultCh:
 		if peerOK {
 			sess.udpPeer = peer
-			logx.Infof("会话 %s：UDP 直连已建立（%s 对端 %s）", sess.id, punch.PathLabel(peer), peer)
+			logx.Infof("会话 %s：UDP 直连已建立（%s）", sess.id, punch.PathLabel(peer))
 			return true
 		}
 	case <-time.After(5 * time.Second):
@@ -857,13 +857,13 @@ func (c *Client) setupP2P(sess *session) (ok bool) {
 func (c *Client) setupRelay(sess *session) bool {
 	select {
 	case g := <-sess.grantCh:
-		conn, addr, err := relaydial.Dial(g.Addr, c.cfg.Platform, "client", sess.id, g.Token)
+		conn, _, err := relaydial.Dial(g.Addr, c.cfg.Platform, "client", sess.id, g.Token)
 		if err != nil {
 			logx.Errorf("会话 %s：连接中继失败：%v", sess.id, err)
 			return false
 		}
 		sess.relay = conn
-		logx.Infof("会话 %s：已接入中继 %s（平台仅转发，业务数据直达对端）", sess.id, addr)
+		logx.Infof("会话 %s：已接入中继（平台仅转发，业务数据直达对端）", sess.id)
 		return true
 	case <-time.After(20 * time.Second):
 		logx.Errorf("会话 %s：等待中继凭证超时", sess.id)
