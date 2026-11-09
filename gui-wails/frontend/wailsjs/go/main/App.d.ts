@@ -12,7 +12,13 @@ export function BuildMode():Promise<string>;
 
 export function CheckUpdate():Promise<main.UpdateInfo>;
 
+export function GetAutoStart():Promise<boolean>;
+
 export function GetLogs():Promise<Array<main.LogEntry>>;
+
+export function GetSavedLogin():Promise<main.loginHint>;
+
+export function GetSavedRules():Promise<main.SavedRules>;
 
 export function GetVersion():Promise<string>;
 
@@ -31,6 +37,8 @@ export function RemoveHost(arg1:string):Promise<main.HostOpResult>;
 export function RemoveMapping(arg1:string,arg2:number,arg3:string):Promise<main.MappingOpResult>;
 
 export function RestoreSession():Promise<main.SessionState>;
+
+export function SetAutoStart(arg1:boolean):Promise<void>;
 
 export function StartAgent(arg1:string,arg2:Array<main.MapRule>,arg3:Array<string>,arg4:string,arg5:string):Promise<void>;
 

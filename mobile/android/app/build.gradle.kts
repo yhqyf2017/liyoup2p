@@ -27,6 +27,21 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // 仅打包手机架构（arm64 + armv7a）：Go 网络栈 .so 占 APK 大头，
+        // 剔除 x86/x86_64（仅模拟器用）可将体积砍掉近半，保持单 APK 可直接安装
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+    }
+
+    // 仅打包手机架构（arm64 + armv7a）：Go 网络栈与 Flutter 引擎 .so 占 APK 大头，
+    // 剔除 x86/x86_64（仅模拟器用）保持单 APK 可直接安装且体积减半
+    packaging {
+        jniLibs {
+            excludes += setOf("lib/x86/**", "lib/x86_64/**")
+            // .so 在 APK 内压缩存储（安装时解压）：分发体积优先，下载更快
+            useLegacyPackaging = true
+        }
     }
 
     buildTypes {
@@ -34,6 +49,10 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // R8 代码收缩 + 资源收缩：dex/资源瘦身；gomobile JNI 反射类在 proguard-rules.pro 全量保留
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }

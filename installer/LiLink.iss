@@ -1,7 +1,7 @@
 ; 励联 LiLink 桌面安装包（Inno Setup 6）
 ; 一个安装包覆盖客户端/服务端双角色：GUI 首次启动自选角色，故不做两份。
 #define MyAppName "励联LiLink"
-#define MyAppVersion "1.1.1"
+#define MyAppVersion "1.1.2"
 #define MyAppPublisher "济源市励友软件有限公司"
 
 [Setup]

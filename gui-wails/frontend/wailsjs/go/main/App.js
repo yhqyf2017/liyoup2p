@@ -22,8 +22,20 @@ export function CheckUpdate() {
   return window['go']['main']['App']['CheckUpdate']();
 }
 
+export function GetAutoStart() {
+  return window['go']['main']['App']['GetAutoStart']();
+}
+
 export function GetLogs() {
   return window['go']['main']['App']['GetLogs']();
+}
+
+export function GetSavedLogin() {
+  return window['go']['main']['App']['GetSavedLogin']();
+}
+
+export function GetSavedRules() {
+  return window['go']['main']['App']['GetSavedRules']();
 }
 
 export function GetVersion() {
@@ -60,6 +72,10 @@ export function RemoveMapping(arg1, arg2, arg3) {
 
 export function RestoreSession() {
   return window['go']['main']['App']['RestoreSession']();
+}
+
+export function SetAutoStart(arg1) {
+  return window['go']['main']['App']['SetAutoStart'](arg1);
 }
 
 export function StartAgent(arg1, arg2, arg3, arg4, arg5) {

@@ -7,6 +7,7 @@ const app = createApp({
       page: 'login',
       isRelease: false, // 正式包：隐藏服务器地址输入并固定默认地址（BuildMode 注入）
       appVersion: '', // 当前版本号（GetVersion 注入，顶栏展示）
+      autoStart: true, // 开机自启开关（默认开启，GetAutoStart 注入用户偏好）
       loading: false,
       switching: false,
       running: false,
@@ -36,6 +37,18 @@ const app = createApp({
         this.isRelease = (await window.go.main.App.BuildMode()) === 'release';
         if (this.isRelease) this.form.platform = 'http://jyly8888.gnway.vip:58894';
       } catch (e) { /* 后端未提供时按 dev 处理 */ }
+      // 登录记忆预填：上次成功登录的租户/账号/密码/设备名/角色（注销后回填）
+      try {
+        const h = await window.go.main.App.GetSavedLogin();
+        if (h) {
+          if (h.tenant) this.form.tenant = h.tenant;
+          if (h.user) this.form.user = h.user;
+          if (h.pass) this.form.pass = h.pass;
+          if (h.dev_name) this.form.devName = h.dev_name;
+          if (h.role === 'server' || h.role === 'client') this.form.role = h.role;
+          if (!this.isRelease && h.platform) this.form.platform = h.platform;
+        }
+      } catch (e) { /* 无登录记忆 */ }
       // 实时日志（后端 EventsE("log", entry)）
       if (window.runtime && window.runtime.EventsOn) {
         window.runtime.EventsOn('log', (entry) => this.onLog(entry));
@@ -46,6 +59,8 @@ const app = createApp({
       }
       // 当前版本号
       try { this.appVersion = await window.go.main.App.GetVersion(); } catch (e) { /* 忽略 */ }
+      // 开机自启偏好（后端默认开启）
+      try { this.autoStart = await window.go.main.App.GetAutoStart(); } catch (e) { /* 忽略 */ }
       // 恢复已保存的登录态
       try {
         const s = await window.go.main.App.RestoreSession();
@@ -167,6 +182,16 @@ const app = createApp({
         if (r.device_role === 'server') {
           this.serverHosts = ['127.0.0.1', ...(r.hosts || [])];
         }
+        // 规则记忆回填：注销/重登后恢复最近一次使用的映射与服务端白名单
+        try {
+          const saved = await window.go.main.App.GetSavedRules();
+          if (saved.rules && saved.rules.length) {
+            this.rules = saved.rules.map((m) => this.toRule(m));
+          }
+          if (r.device_role === 'server' && saved.hosts && saved.hosts.length) {
+            this.serverHosts = ['127.0.0.1', ...saved.hosts];
+          }
+        } catch (e) { /* 无规则记忆 */ }
         this.logs = [];
         this.declaredPorts = [];
         this.newHost = '';
@@ -228,6 +253,18 @@ const app = createApp({
       this.newHost = '';
       this.running = false;
       this.page = 'login';
+    },
+
+    // ---------- 开机自启开关 ----------
+    async setAutoStart(v) {
+      try {
+        await window.go.main.App.SetAutoStart(!!v);
+        this.autoStart = !!v;
+        ElementPlus.ElMessage.success(v ? '已开启开机自启' : '已关闭开机自启');
+      } catch (e) {
+        this.autoStart = !v;
+        ElementPlus.ElMessage.error(String(e).replace(/^\s*Error:\s*/, ''));
+      }
     },
 
     // ---------- 检查更新 ----------

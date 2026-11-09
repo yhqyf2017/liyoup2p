@@ -185,6 +185,14 @@ func (a *App) startup(ctx context.Context) {
 	go installWindowHook(a) // 子类化主窗口：拦截最小化 → 隐藏到托盘
 	go runWinOpLoop(a)      // 串行消费窗口显隐操作（托盘唤回/最小化隐藏唯一执行点）
 	startTray(a)            // 托盘常驻（图标 + 菜单 + 气泡）
+	// 开机自启：默认开启，按用户偏好同步注册表（每次启动刷新 exe 路径）
+	if err := ensureAutostart(); err != nil {
+		a.logf("warn", "开机自启注册失败：%v", err)
+	}
+	// 开机自启拉起（--autostart）：隐藏到托盘并自动恢复连接
+	if bootAutostart {
+		go a.autostartBoot()
+	}
 }
 
 // beforeClose 窗口关闭钩子：
@@ -462,14 +470,49 @@ func (a *App) RestoreSession() (*SessionState, error) {
 	return &out, nil
 }
 
-// Logout 停止 Agent 并清除本机登录态。
+// loginHint 登录记忆：最近一次成功登录的凭据，注销后回填登录页（含密码，与
+// 设备令牌同为落盘敏感信息，仅存本机 ProgramData 设置文件内）。
+type loginHint struct {
+	Platform string `json:"platform,omitempty"`
+	Tenant   string `json:"tenant,omitempty"`
+	User     string `json:"user,omitempty"`
+	Pass     string `json:"pass,omitempty"`
+	DevName  string `json:"dev_name,omitempty"`
+	Role     string `json:"role,omitempty"`
+}
+
+// saveLoginHint 记录登录凭据（覆盖最近一次；失败静默，不影响登录流程）。
+func saveLoginHint(h loginHint) {
+	m := readSettings()
+	m["login"] = h
+	_ = writeSettings(m)
+}
+
+// GetSavedLogin 读取登录记忆（登录页预填；从未成功登录过返回空对象）。
+func (a *App) GetSavedLogin() *loginHint {
+	v, ok := readSettings()["login"].(map[string]any)
+	if !ok {
+		return &loginHint{}
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		return &loginHint{}
+	}
+	var h loginHint
+	if json.Unmarshal(b, &h) != nil {
+		return &loginHint{}
+	}
+	return &h
+}
+
+// Logout 停止 Agent 并清除本机登录态（登录记忆保留，下次登录页预填）。
 func (a *App) Logout() {
 	a.StopAgent()
 	_ = os.Remove(sessionFile())
 	a.mu.Lock()
 	a.session = nil
 	a.mu.Unlock()
-	a.logf("info", "已退出登录，本机凭据已清除")
+	a.logf("info", "已退出登录")
 }
 
 // ---------- 登录 / 注册 ----------
@@ -564,6 +607,7 @@ func (a *App) Login(platformURL, tenant, user, pass, devName, role string, mappi
 		host, _ := os.Hostname()
 		devName = host
 	}
+	saveLoginHint(loginHint{Platform: base, Tenant: tenant, User: user, Pass: pass, DevName: devName, Role: role})
 	// 复用本机已注册的设备记录：平台同平台+同租户+同角色时带上原 DeviceUID（注册接口
 	// 按 UID 幂等，重签令牌），避免每次登录都新建一条同名设备堆积在设备列表里，
 	// 导致客户端自动路由连到未配置白名单的旧设备记录。
@@ -1073,6 +1117,7 @@ func (a *App) updateMappings(fn func([]MapRule) []MapRule) {
 	if err != nil {
 		a.logf("warn", "映射配置保存失败：%v", err)
 	}
+	a.saveRulesHint(s.Mappings, s.Hosts) // 规则记忆镜像：注销后保留
 }
 
 // adminMapItem Agent 映射列表条目。
@@ -1283,4 +1328,45 @@ func (a *App) updateHosts(fn func([]string) []string) {
 	if err != nil {
 		a.logf("warn", "内网主机配置保存失败：%v", err)
 	}
+	a.saveRulesHint(s.Mappings, s.Hosts) // 规则记忆镜像：注销后保留
+}
+
+// SavedRules 规则记忆：客户端端口映射 + 服务端白名单（注销/重登后回填）。
+type SavedRules struct {
+	Rules []MapRule `json:"rules"`
+	Hosts []string  `json:"hosts"`
+}
+
+// saveRulesHint 规则记忆：把当前映射与白名单镜像到设置文件（与登录态分离，注销后保留）。
+func (a *App) saveRulesHint(rules []MapRule, hosts []string) {
+	m := readSettings()
+	m["rules"] = rules
+	m["hosts"] = hosts
+	_ = writeSettings(m)
+}
+
+// GetSavedRules 读取规则记忆（重新登录后回填；从未配置过返回空列表）。
+func (a *App) GetSavedRules() *SavedRules {
+	out := &SavedRules{Rules: []MapRule{}, Hosts: []string{}}
+	m := readSettings()
+	if v, ok := m["rules"].([]any); ok {
+		for _, item := range v {
+			b, err := json.Marshal(item)
+			if err != nil {
+				continue
+			}
+			var r MapRule
+			if json.Unmarshal(b, &r) == nil && r.Remote > 0 && r.Local != "" {
+				out.Rules = append(out.Rules, r)
+			}
+		}
+	}
+	if v, ok := m["hosts"].([]any); ok {
+		for _, item := range v {
+			if h, ok := item.(string); ok && h != "" && h != "127.0.0.1" {
+				out.Hosts = append(out.Hosts, h)
+			}
+		}
+	}
+	return out
 }
