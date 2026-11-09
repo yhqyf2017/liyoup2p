@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -6,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'p2p_bridge.dart';
 
 /// 应用版本（与 pubspec.yaml version 保持一致，发布时同步更新）。
-const String kAppVersion = '1.1.1';
+const String kAppVersion = '1.1.2';
 
 /// 自动检查更新开关的持久化键（缺省为开启）。
 const String kAutoUpdateKey = 'update.auto';
@@ -141,9 +142,15 @@ class UpdateService {
       final sink = file.openWrite();
       var received = 0;
       try {
-        await for (final chunk in resp) {
+        // 网络停滞保护：45s 无新数据视为中断，避免弱网/切换网络时无限挂起
+        await for (final chunk in resp.timeout(
+          const Duration(seconds: 45),
+          onTimeout: (s) => s.addError(
+            TimeoutException('网络停滞，下载已中断'),
+          ),
+        )) {
           received += chunk.length;
-          await sink.addStream(Stream<List<int>>.fromIterable([chunk]));
+          sink.add(chunk);
           yield total > 0 ? received / total : 0.0;
         }
         await sink.flush();

@@ -42,25 +42,11 @@ class _SettingsPageState extends State<SettingsPage> {
 
   /// 退出登录：二次确认，停止隧道并清空会话，回到登录页。
   Future<void> _logout() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('退出登录'),
-        content: const Text('退出后正在运行的映射连接将被停止，确定要退出吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-            ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('退出登录'),
-          ),
-        ],
-      ),
+    final ok = await confirmDanger(
+      context,
+      title: '退出登录',
+      message: '退出后正在运行的映射连接将被停止，确定要退出吗？',
+      confirmLabel: '退出登录',
     );
     if (ok != true || !mounted) return;
     try {
@@ -104,15 +90,24 @@ class _SettingsPageState extends State<SettingsPage> {
     final progress = ValueNotifier<double?>(null); // null=未开始下载
     await showModalBottomSheet<void>(
       context: context,
-      isDismissible: !u.force,
-      enableDrag: !u.force,
+      // 下载期间不可下拉/点外部关闭，进度不会中途消失；未开始下载时由内容区按钮/返回关闭
+      isDismissible: false,
+      enableDrag: false,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
         final dark = Theme.of(ctx).brightness == Brightness.dark;
-        return SafeArea(
+        return PopScope(
+          // 下载中禁止返回键关闭（防止后台静默下载、进度丢失）；
+          // 未开始下载时放行系统返回 = 关闭卡片。
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (didPop) return;
+            if (progress.value == null) Navigator.of(ctx).pop();
+          },
+          child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(T.s20, T.s20, T.s20, T.s20),
             child: Column(
@@ -233,6 +228,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ],
             ),
           ),
+          ),
         );
       },
     );
@@ -252,9 +248,21 @@ class _SettingsPageState extends State<SettingsPage> {
       final sep = Platform.pathSeparator;
       final path =
           '${dir.endsWith(sep) ? dir : '$dir$sep'}LiLink_${u.version}.apk';
-      await for (final p in UpdateService.download(u.url, path)) {
+      // 先下载到 .part 临时文件，哈希校验通过后才改名落地，
+      // 避免中断/被篡改的半截文件被当作有效安装包拉起安装器。
+      final partPath = '$path.part';
+      final part = File(partPath);
+      if (await part.exists()) await part.delete();
+      await for (final p in UpdateService.download(
+        u.url,
+        partPath,
+        expectedSha256: u.sha256,
+      )) {
         progress.value = p;
       }
+      final target = File(path);
+      if (await target.exists()) await target.delete();
+      await part.rename(path);
       await AppInstaller.install(path);
       if (sheetCtx.mounted) Navigator.of(sheetCtx).pop();
     } catch (e) {
