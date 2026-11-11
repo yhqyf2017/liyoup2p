@@ -100,7 +100,13 @@ const app = createApp({
     startPoll() {
       this._pollTimer = setInterval(async () => {
         if (this.page !== 'work') return;
-        try { this.running = await window.go.main.App.IsRunning(); } catch (e) { /* 忽略 */ }
+        try {
+          const running = await window.go.main.App.IsRunning();
+          // 状态变化时统一走 onAgentState：开机自启场景 agent 在前端订阅事件前
+          // 已启动，agent-state 事件已错过，靠轮询差异补齐映射行的生效标记
+          if (running !== this.running) this.onAgentState(running);
+          else this.running = running;
+        } catch (e) { /* 忽略 */ }
       }, 1500);
     },
     stopPoll() { if (this._pollTimer) clearInterval(this._pollTimer); },

@@ -10,7 +10,8 @@ import '../models/map_rule.dart';
 /// 此时登录页隐藏服务器地址输入、固定内置平台地址，日志与界面文本脱敏。
 const bool kHideServerAddr = kReleaseMode && bool.fromEnvironment('RELEASE');
 
-/// 内置默认平台地址（正式包固定使用）。
+/// 内置默认平台地址（正式包固定使用）。58894 为 TCP 直射端点，WS 可用；
+/// gnway.org:880 HTTPS 代理不转发 WS 升级头（信令 400），暂不可用。
 const String kDefaultServerURL = 'http://jyly8888.gnway.vip:58894';
 
 const String _serverHost = 'jyly8888.gnway.vip:58894';

@@ -102,6 +102,9 @@ const (
 // ---------- 构建模式与地址脱敏 ----------
 
 // defaultPlatformURL 内置默认平台地址：正式包登录与信令固定使用。
+// 58894 为 TCP 直射端点，WebSocket 升级头可完整透传；
+// gnway.org:880 为 openresty HTTPS 代理，不转发 Upgrade/Connection 头，
+// WS 信令会 400，待隧道侧支持 WS 后方可切换（2026-11-11 验证）。
 const defaultPlatformURL = "http://jyly8888.gnway.vip:58894"
 
 // redactedURL 正式包对外（前端/日志/配置文件）展示的地址占位。
