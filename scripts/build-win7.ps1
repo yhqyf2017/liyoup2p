@@ -11,7 +11,7 @@
 $ErrorActionPreference = 'Stop'
 
 $Go120 = 'D:\soft\go1.20.14\bin\go.exe'
-$Ver   = '1.1.8'
+$Ver   = '1.1.9'
 $Root  = Split-Path -Parent $PSScriptRoot
 $Out   = Join-Path $Root 'dist\win7'
 $ISCC  = 'D:\soft\innosetup\ISCC.exe'

@@ -20,7 +20,8 @@ import (
 )
 
 const (
-	updateCheckInterval = 12 * time.Hour // 自动检查周期
+	updateCheckInterval = 12 * time.Hour   // 自动检查周期（检查成功后）
+	updateRetryInterval = 5 * time.Minute  // 检查失败重试（如开机网络未就绪）
 	updateStartupDelay  = 5 * time.Second
 	updateHTTPTimeout   = 15 * time.Second // 版本查询超时
 )
@@ -70,29 +71,35 @@ func (a *App) fetchLatest() (*latestInfo, error) {
 	return &env.Data, nil
 }
 
-// updateLoop 后台自动检查：启动延迟后首轮，之后按周期循环（进程存活期内持续）。
+// updateLoop 后台自动检查：启动延迟后首轮，成功后按周期循环；失败（开机网络未就绪等）
+// 短间隔重试，避免错过新版本（进程存活期内持续）。
 func (a *App) updateLoop() {
 	time.Sleep(updateStartupDelay)
 	for {
-		a.autoUpdate()
-		time.Sleep(updateCheckInterval)
+		if a.autoUpdate() {
+			time.Sleep(updateCheckInterval)
+		} else {
+			time.Sleep(updateRetryInterval)
+		}
 	}
 }
 
 // autoUpdate 静默自动升级：发现新版本 → 下载校验 → 静默安装 → 退出自身。
-func (a *App) autoUpdate() {
+// 返回本次检查是否成功完成（无论有无新版本）。
+func (a *App) autoUpdate() bool {
 	info, err := a.fetchLatest()
 	if err != nil {
 		a.logf("warn", "检查更新失败：%v", sanitizeServerText(err.Error()))
-		return
+		return false
 	}
 	if info.Version == "" || !versionNewer(appVersion, info.Version) {
-		return
+		return true
 	}
 	a.logf("info", "发现新版本 %s（当前 %s），正在后台下载…", info.Version, appVersion)
 	if err := a.downloadAndInstall(info); err != nil {
 		a.logf("error", "自动更新失败：%v", err)
 	}
+	return true
 }
 
 // versionNewer 语义化版本比对（major.minor.patch，忽略前缀 v 与后缀）：latest > cur 时为真。

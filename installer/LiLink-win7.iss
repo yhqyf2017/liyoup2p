@@ -2,7 +2,7 @@
 ; 与主包（LiLink.iss）同 AppId：用户从 Win10 包换装 Win7 包不会装出两份。
 ; 内嵌 amd64+386 双架构产物，安装时按系统位数自动选择，32/64 位 Win7 通用。
 #define MyAppName "励联LiLink"
-#define MyAppVersion "1.1.8"
+#define MyAppVersion "1.1.9"
 #define MyAppPublisher "济源市励友软件有限公司"
 
 [Setup]

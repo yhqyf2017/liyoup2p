@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"unicode/utf16"
+	"unsafe"
 
 	"github.com/lxn/walk"
 	"github.com/lxn/win"
@@ -40,6 +41,7 @@ type uiState struct {
 	lblDot      *walk.Label // 状态红绿灯（品牌横幅内）
 	lblStatus   *walk.Label // 横幅内白色状态文字
 	btnLogout   *walk.PushButton
+	btnUpdate   *walk.PushButton
 	grpRules    *walk.GroupBox // 客户端：映射区
 	grpHosts    *walk.GroupBox // 服务端：白名单区
 	table       *walk.TableView
@@ -149,15 +151,47 @@ func runUI(a *App) error {
 			HSpacer{},
 		},
 	}
-	formChildren = append(formChildren, Label{Text: ""}, loginBtnRow)
+	// 检查更新入口独立成行并水平居中（登录页也能手动触发更新检查）
+	updateBtnRow := Composite{
+		ColumnSpan: 2,
+		Layout:     HBox{Margins: Margins{}, Spacing: 0},
+		Children: []Widget{
+			HSpacer{},
+			PushButton{Text: "检查更新", MinSize: Size{Width: 160, Height: 28},
+				OnClicked: func() { go ui.CheckUpdateManual() }},
+			HSpacer{},
+		},
+	}
+	formChildren = append(formChildren, Label{Text: ""}, loginBtnRow, updateBtnRow)
+
+	// 按屏幕可用区域（不含任务栏）夹紧窗口尺寸：
+	// 低分辨率（1024×768）或 125%/150% 缩放下，固定 680 高度会超出屏幕导致底部截断
+	// （SPI_GETWORKAREA = 0x0048，旧版 lxn/win 未定义该常量）
+	sizeW, sizeH, minH := 560, 680, 600
+	var wa win.RECT
+	if win.SystemParametersInfo(0x0048, 0, unsafe.Pointer(&wa), 0) {
+		availW := int(wa.Right-wa.Left) - 24
+		availH := int(wa.Bottom-wa.Top) - 16
+		if availW > 0 && sizeW > availW {
+			sizeW = availW
+		}
+		if availH > 0 {
+			if sizeH > availH {
+				sizeH = availH
+			}
+			if minH > sizeH {
+				minH = sizeH
+			}
+		}
+	}
 
 	mainWindow := MainWindow{
 		AssignTo: &ui.mw,
 		Title:    siWndTitle,
 		Icon:     appIcon,
 		Font:     Font{Family: "微软雅黑", PointSize: 10},
-		MinSize:  Size{Width: 520, Height: 600},
-		Size:     Size{Width: 560, Height: 680},
+		MinSize:  Size{Width: 480, Height: minH},
+		Size:     Size{Width: sizeW, Height: sizeH},
 		Visible:  !bootAutostart, // 开机自启拉起：窗口不显示，仅托盘
 		Layout:   VBox{Margins: Margins{Left: 14, Top: 12, Right: 14, Bottom: 12}, Spacing: 10},
 		Children: []Widget{
@@ -195,8 +229,8 @@ func runUI(a *App) error {
 					},
 					Composite{
 						Layout: Grid{Columns: 2, Spacing: 12, Margins: Margins{}},
-						Children: append(append([]Widget{}, formChildren[:len(formChildren)-2]...),
-							Label{Text: ""}, loginBtnRow),
+						Children: append(append([]Widget{}, formChildren[:len(formChildren)-3]...),
+							Label{Text: ""}, loginBtnRow, updateBtnRow),
 					},
 					VSpacer{StretchFactor: 3},
 				},
@@ -217,6 +251,8 @@ func runUI(a *App) error {
 							Label{AssignTo: &ui.lblDot, Text: "●", TextColor: walk.RGB(235, 90, 90)},
 							Label{AssignTo: &ui.lblStatus, Text: "状态：未连接",
 								TextColor: walk.RGB(255, 255, 255), StretchFactor: 1},
+							PushButton{AssignTo: &ui.btnUpdate, Text: "检查更新", MinSize: Size{Width: 80},
+								OnClicked: func() { go ui.CheckUpdateManual() }},
 							PushButton{AssignTo: &ui.btnLogout, Text: "注销", MinSize: Size{Width: 80},
 								OnClicked: func() { ui.onLogout() }},
 						},
