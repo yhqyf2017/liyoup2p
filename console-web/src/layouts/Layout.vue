@@ -1,75 +1,79 @@
 <template>
   <div class="layout">
-    <!-- 左侧导航：浅色底 + 深色字 -->
-    <aside class="layout-aside">
-      <div class="aside-brand">
-        <Logo :size="34" />
-        <div class="brand-text">
-          <div class="brand-name">励联 LiLink</div>
-          <div class="brand-sub">管理控制台</div>
+    <!-- 顶部通栏：logo + 页面标题居左，操作居右 -->
+    <header class="layout-header">
+      <div class="header-left">
+        <div class="aside-brand">
+          <Logo :size="34" />
+          <div class="brand-text">
+            <div class="brand-name">励联 LiLink</div>
+            <div class="brand-sub">管理控制台</div>
+          </div>
         </div>
-      </div>
-      <el-menu class="layout-menu" :default-active="activePath" router>
-        <div class="menu-group-title">总览</div>
-        <el-menu-item index="/dashboard">
-          <el-icon><Odometer /></el-icon>
-          <span>工作台</span>
-        </el-menu-item>
-        <div class="menu-group-title">资源管理</div>
-        <el-menu-item index="/devices">
-          <el-icon><Monitor /></el-icon>
-          <span>设备管理</span>
-        </el-menu-item>
-        <div class="menu-group-title">运营监控</div>
-        <el-menu-item index="/audit">
-          <el-icon><Document /></el-icon>
-          <span>访问审计</span>
-        </el-menu-item>
-        <el-menu-item index="/alerts">
-          <el-icon><Bell /></el-icon>
-          <span>告警中心</span>
-        </el-menu-item>
-        <div class="menu-group-title">权限管理</div>
-        <el-menu-item index="/users">
-          <el-icon><User /></el-icon>
-          <span>成员管理</span>
-        </el-menu-item>
-        <el-menu-item v-if="superRole" index="/tenants">
-          <el-icon><OfficeBuilding /></el-icon>
-          <span>租户管理</span>
-        </el-menu-item>
-        <el-menu-item v-if="superRole" index="/updates">
-          <el-icon><Upload /></el-icon>
-          <span>版本发布</span>
-        </el-menu-item>
-      </el-menu>
-    </aside>
-
-    <div class="layout-right">
-      <!-- 顶栏：白底 1px 边框 -->
-      <header class="layout-header">
+        <el-divider direction="vertical" class="header-sep" />
         <div class="header-title">{{ route.meta.title }}</div>
-        <div class="header-actions">
-          <el-tooltip content="切换主题" placement="bottom">
-            <el-button text class="bell-btn" @click="toggleTheme">
-              <el-icon :size="18"><Sunny v-if="theme === 'dark'" /><Moon v-else /></el-icon>
-            </el-button>
-          </el-tooltip>
-          <el-badge :value="store.alertUnread" :hidden="!store.alertUnread" :max="99" class="bell-badge">
-            <el-button text class="bell-btn" @click="goAlerts">
-              <el-icon :size="18"><Bell /></el-icon>
-            </el-button>
-          </el-badge>
-          <el-divider direction="vertical" />
-          <span class="header-user">{{ store.user ? store.user.username : '' }}</span>
-          <el-tag :type="roleTag" size="small" effect="light">{{ roleLabel }}</el-tag>
-          <el-tooltip content="退出登录" placement="bottom">
-            <el-button text class="bell-btn" @click="logout">
-              <el-icon :size="18"><SwitchButton /></el-icon>
-            </el-button>
-          </el-tooltip>
-        </div>
-      </header>
+      </div>
+      <div class="header-actions">
+        <el-tooltip content="切换主题" placement="bottom">
+          <el-button text class="bell-btn" @click="toggleTheme">
+            <el-icon :size="18"><Sunny v-if="theme === 'dark'" /><Moon v-else /></el-icon>
+          </el-button>
+        </el-tooltip>
+        <el-badge :value="store.alertUnread" :hidden="!store.alertUnread" :max="99" class="bell-badge">
+          <el-button text class="bell-btn" @click="goAlerts">
+            <el-icon :size="18"><Bell /></el-icon>
+          </el-button>
+        </el-badge>
+        <el-divider direction="vertical" />
+        <span class="header-user">{{ store.user ? store.user.username : '' }}</span>
+        <el-tag :type="roleTag" size="small" effect="light">{{ roleLabel }}</el-tag>
+        <el-tooltip content="退出登录" placement="bottom">
+          <el-button text class="bell-btn" @click="logout">
+            <el-icon :size="18"><SwitchButton /></el-icon>
+          </el-button>
+        </el-tooltip>
+      </div>
+    </header>
+
+    <!-- 下方左右分栏：左菜单 + 右内容 -->
+    <div class="layout-body">
+      <aside class="layout-aside">
+        <el-menu class="layout-menu" :default-active="activePath" router>
+          <div class="menu-group-title">总览</div>
+          <el-menu-item index="/dashboard">
+            <el-icon><Odometer /></el-icon>
+            <span>工作台</span>
+          </el-menu-item>
+          <div class="menu-group-title">资源管理</div>
+          <el-menu-item index="/devices">
+            <el-icon><Monitor /></el-icon>
+            <span>设备管理</span>
+          </el-menu-item>
+          <div class="menu-group-title">运营监控</div>
+          <el-menu-item index="/audit">
+            <el-icon><Document /></el-icon>
+            <span>访问审计</span>
+          </el-menu-item>
+          <el-menu-item index="/alerts">
+            <el-icon><Bell /></el-icon>
+            <span>告警中心</span>
+          </el-menu-item>
+          <div class="menu-group-title">权限管理</div>
+          <el-menu-item index="/users">
+            <el-icon><User /></el-icon>
+            <span>成员管理</span>
+          </el-menu-item>
+          <el-menu-item v-if="superRole" index="/tenants">
+            <el-icon><OfficeBuilding /></el-icon>
+            <span>租户管理</span>
+          </el-menu-item>
+          <el-menu-item v-if="superRole" index="/updates">
+            <el-icon><Upload /></el-icon>
+            <span>版本发布</span>
+          </el-menu-item>
+        </el-menu>
+      </aside>
+
       <main class="layout-main">
         <router-view v-slot="{ Component }">
           <transition name="fade" mode="out-in">
@@ -136,29 +140,43 @@ function logout() {
 <style scoped>
 .layout {
   display: flex;
+  flex-direction: column;
   height: 100vh;
   overflow: hidden;
 }
 
-.layout-aside {
-  width: 220px;
+/* 顶部通栏：logo + 标题 + 全局操作，横贯整个宽度 */
+.layout-header {
+  height: 60px;
   flex-shrink: 0;
   display: flex;
-  flex-direction: column;
-  background: var(--app-surface-2);
-  border-right: 1px solid var(--app-border);
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px 0 14px;
+  background: var(--app-surface);
+  border-bottom: 1px solid var(--app-border);
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+/* logo 块宽度与下方侧栏对齐，右侧分隔线与侧栏右边框上下连成一条线 */
 .aside-brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  /* 高度与顶栏严格对齐：下边框线与 header 的 border-bottom 平齐，
-     与侧栏右边框在左上角交汇成一条连续的框架线，避免双线错位 */
-  height: 60px;
+  width: 206px;
   flex-shrink: 0;
-  padding: 0 18px;
-  border-bottom: 1px solid var(--app-border);
+  padding-left: 6px;
+}
+
+.header-sep {
+  height: 26px;
+  margin: 0 18px 0 0;
 }
 
 .brand-text {
@@ -175,6 +193,49 @@ function logout() {
 .brand-sub {
   font-size: 12px;
   color: var(--app-text-3);
+}
+
+.header-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--app-text-1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.bell-btn {
+  padding: 6px;
+  color: var(--app-text-2);
+}
+
+.header-user {
+  font-size: 13.5px;
+  color: var(--app-text-1);
+  font-weight: 500;
+}
+
+/* 下方左右分栏 */
+.layout-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.layout-aside {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--app-surface-2);
+  border-right: 1px solid var(--app-border);
 }
 
 .layout-menu {
@@ -238,49 +299,9 @@ function logout() {
   letter-spacing: 1px;
 }
 
-.layout-right {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.layout-header {
-  height: 60px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-  background: var(--app-surface);
-  border-bottom: 1px solid var(--app-border);
-}
-
-.header-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--app-text-1);
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.bell-btn {
-  padding: 6px;
-  color: var(--app-text-2);
-}
-
-.header-user {
-  font-size: 13.5px;
-  color: var(--app-text-1);
-  font-weight: 500;
-}
-
 .layout-main {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
