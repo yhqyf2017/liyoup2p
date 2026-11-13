@@ -17,15 +17,17 @@ type UsersAPI struct {
 
 var validRoles = map[string]bool{"super_admin": true, "tenant_admin": true, "operator": true, "auditor": true}
 
-// ListUsers 用户列表。
+// ListUsers 用户列表（分页）：keyword 模糊匹配用户名；tenant_id 仅超管可传（0/空=全部，-1=平台账号，>0=指定租户），非超管强制本租户。
 func (a *UsersAPI) List(w http.ResponseWriter, r *http.Request) {
 	u := CurrentUser(r)
-	users, err := a.St.ListUsers(r.Context(), tenantScope(r, u))
+	page, size := PageArgs(r)
+	keyword := strings.TrimSpace(r.URL.Query().Get("keyword"))
+	users, total, err := a.St.ListUsers(r.Context(), tenantScope(r, u), keyword, page, size)
 	if err != nil {
 		Fail(w, http.StatusInternalServerError, 5000, "查询用户失败: "+err.Error())
 		return
 	}
-	OK(w, map[string]any{"items": users, "total": len(users)})
+	OK(w, map[string]any{"items": users, "total": total})
 }
 
 type createUserRequest struct {

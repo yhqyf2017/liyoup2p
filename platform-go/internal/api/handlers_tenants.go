@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 // TenantsAPI 租户管理（仅 super_admin，由路由中间件保证）。
@@ -11,14 +12,16 @@ type TenantsAPI struct {
 	St storeIface
 }
 
-// List 租户列表。
+// List 租户列表（分页，keyword 模糊匹配名称/编码）。
 func (a *TenantsAPI) List(w http.ResponseWriter, r *http.Request) {
-	tenants, err := a.St.ListTenants(r.Context())
+	page, size := PageArgs(r)
+	keyword := strings.TrimSpace(r.URL.Query().Get("keyword"))
+	tenants, total, err := a.St.ListTenants(r.Context(), keyword, page, size)
 	if err != nil {
 		Fail(w, http.StatusInternalServerError, 5000, "查询租户失败: "+err.Error())
 		return
 	}
-	OK(w, map[string]any{"items": tenants, "total": len(tenants)})
+	OK(w, map[string]any{"items": tenants, "total": total})
 }
 
 type createTenantRequest struct {

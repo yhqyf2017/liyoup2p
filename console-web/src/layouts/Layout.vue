@@ -153,7 +153,11 @@ function logout() {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 16px 18px;
+  /* 高度与顶栏严格对齐：下边框线与 header 的 border-bottom 平齐，
+     与侧栏右边框在左上角交汇成一条连续的框架线，避免双线错位 */
+  height: 60px;
+  flex-shrink: 0;
+  padding: 0 18px;
   border-bottom: 1px solid var(--app-border);
 }
 

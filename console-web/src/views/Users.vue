@@ -84,11 +84,13 @@
       <el-pagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
-        :total="filteredList.length"
+        :total="total"
         :page-sizes="[10, 20, 50, 100]"
         layout="total, sizes, prev, pager, next, jumper"
         background
         class="table-pager"
+        @current-change="load"
+        @size-change="onSizeChange"
       />
     </div>
 
@@ -160,6 +162,7 @@ import { store, isSuper, canWriteUsers, ROLE_LABELS, ROLE_TAG_TYPES } from '../s
 import { fmtTime } from '../utils'
 
 const list = ref([])
+const total = ref(0)
 const loading = ref(false)
 const keyword = ref('')
 const tenantFilter = ref(null) // null=全部（显示占位符），-1=平台账号，>0=租户 ID
@@ -169,21 +172,12 @@ const currentUserId = computed(() => (store.user ? store.user.id : 0))
 const isSelf = (row) => row.ID === currentUserId.value
 const isSelfById = () => currentRow.value && currentRow.value.ID === currentUserId.value
 
-// 按租户聚合展示：同租户成员相邻，租户名为空（平台账号）排最后
-const filteredList = computed(() => {
-  let arr = list.value
-  const tf = tenantFilter.value || 0
-  if (isSuper() && tf !== 0) {
-    arr = arr.filter((u) => {
-      const id = u.TenantID && u.TenantID.Valid ? u.TenantID.Int64 : 0
-      return tf === -1 ? id === 0 : id === tf
-    })
-  }
-  const kw = keyword.value.trim().toLowerCase()
-  if (kw) {
-    arr = arr.filter((u) => `${u.Username} ${u.TenantName || ''}`.toLowerCase().includes(kw))
-  }
-  return arr.slice().sort((a, b) => {
+const page = ref(1)
+const pageSize = ref(20)
+
+// 当前页数据按租户聚合展示：同租户成员相邻，租户名为空（平台账号）排最后，供 span-method 合并
+const pagedList = computed(() => {
+  return list.value.slice().sort((a, b) => {
     const an = a.TenantName || ''
     const bn = b.TenantName || ''
     if (!an && bn) return 1
@@ -192,18 +186,16 @@ const filteredList = computed(() => {
   })
 })
 
-// 前端分页
-const page = ref(1)
-const pageSize = ref(20)
-const pagedList = computed(() => {
-  const start = (page.value - 1) * pageSize.value
-  return filteredList.value.slice(start, start + pageSize.value)
+// 筛选条件变化：回到第 1 页并重新请求后端（租户筛选经 tenant_id 参数由后端过滤）
+watch([keyword, tenantFilter], () => {
+  page.value = 1
+  load()
 })
 
-// 过滤条件变化时回到第 1 页
-watch([keyword, tenantFilter, pageSize], () => {
+function onSizeChange() {
   page.value = 1
-})
+  load()
+}
 
 // 「所属租户」列（第 4 列）合并同租户单元格；仅一组（单租户视角）时正常整列合并显示
 const TENANT_COLUMN_INDEX = 3
@@ -242,8 +234,12 @@ const roleOptions = computed(() => {
 async function load() {
   loading.value = true
   try {
-    const data = await http.get('/api/users')
+    const params = { page: page.value, page_size: pageSize.value }
+    if (keyword.value.trim()) params.keyword = keyword.value.trim()
+    if (tenantFilter.value) params.tenant_id = tenantFilter.value // -1=平台账号，>0=指定租户
+    const data = await http.get('/api/users', { params })
     list.value = data.items || []
+    total.value = data.total || 0
   } finally {
     loading.value = false
   }
@@ -252,7 +248,7 @@ async function load() {
 async function ensureTenants() {
   if (isSuper() && tenants.value.length === 0) {
     try {
-      const data = await http.get('/api/tenants', { silent: true })
+      const data = await http.get('/api/tenants', { params: { page_size: 100 }, silent: true })
       tenants.value = data.items || []
     } catch {
       tenants.value = []

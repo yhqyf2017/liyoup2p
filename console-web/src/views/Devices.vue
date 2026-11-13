@@ -23,11 +23,11 @@
         <el-option label="平台设备" :value="-1" />
         <el-option v-for="t in tenants" :key="t.id" :label="`${t.name}（${t.code}）`" :value="t.id" />
       </el-select>
-      <el-select v-model="filterRole" placeholder="设备角色" clearable style="width: 150px" @change="load">
+      <el-select v-model="filterRole" placeholder="设备角色" clearable style="width: 150px">
         <el-option label="服务端" value="server" />
         <el-option label="客户端" value="client" />
       </el-select>
-      <el-select v-model="filterStatus" placeholder="设备状态" clearable style="width: 150px" @change="load">
+      <el-select v-model="filterStatus" placeholder="设备状态" clearable style="width: 150px">
         <el-option label="在线" value="online" />
         <el-option label="离线" value="offline" />
         <el-option label="已吊销" value="revoked" />
@@ -45,7 +45,7 @@
 
     <div class="page-card table-card">
 
-      <el-table v-loading="loading" :data="pagedList" height="100%" style="width: 100%">
+      <el-table v-loading="loading" :data="list" height="100%" style="width: 100%">
         <el-table-column label="设备 UID" prop="device_uid" min-width="160">
           <template #default="{ row }"><span class="mono">{{ row.device_uid }}</span></template>
         </el-table-column>
@@ -92,11 +92,13 @@
       <el-pagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
-        :total="filteredList.length"
+        :total="total"
         :page-sizes="[10, 20, 50, 100]"
         layout="total, sizes, prev, pager, next, jumper"
         background
         class="table-pager"
+        @current-change="load"
+        @size-change="onSizeChange"
       />
     </div>
 
@@ -175,7 +177,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, Refresh, Search, CopyDocument } from '@element-plus/icons-vue'
 import http from '../api'
@@ -188,6 +190,7 @@ import {
 } from '../utils'
 
 const list = ref([])
+const total = ref(0)
 const loading = ref(false)
 const filterRole = ref('')
 const filterStatus = ref('')
@@ -195,38 +198,24 @@ const filterTenant = ref(null) // null=全部（显示占位符），-1=平台�
 const keyword = ref('')
 const tenants = ref([])
 
-const filteredList = computed(() => {
-  let arr = list.value
-  const tf = filterTenant.value || 0
-  if (isSuper() && tf !== 0) {
-    arr = arr.filter((d) => (tf === -1 ? !d.tenant_id : d.tenant_id === tf))
-  }
-  const kw = keyword.value.trim().toLowerCase()
-  if (kw) {
-    arr = arr.filter(
-      (d) => `${d.device_uid} ${d.name} ${d.owner || ''} ${d.tenant_name || ''}`.toLowerCase().includes(kw)
-    )
-  }
-  return arr
-})
-
-// 前端分页
 const page = ref(1)
 const pageSize = ref(20)
-const pagedList = computed(() => {
-  const start = (page.value - 1) * pageSize.value
-  return filteredList.value.slice(start, start + pageSize.value)
+
+// 筛选条件变化：回到第 1 页并重新请求后端
+watch([keyword, filterTenant, filterRole, filterStatus], () => {
+  page.value = 1
+  load()
 })
 
-// 过滤条件变化时回到第 1 页
-watch([keyword, filterTenant, filterRole, filterStatus, pageSize], () => {
+function onSizeChange() {
   page.value = 1
-})
+  load()
+}
 
 async function ensureTenants() {
   if (isSuper() && tenants.value.length === 0) {
     try {
-      const data = await http.get('/api/tenants', { silent: true })
+      const data = await http.get('/api/tenants', { params: { page_size: 100 }, silent: true })
       tenants.value = data.items || []
     } catch {
       tenants.value = []
@@ -237,11 +226,14 @@ async function ensureTenants() {
 async function load() {
   loading.value = true
   try {
-    const params = {}
+    const params = { page: page.value, page_size: pageSize.value }
+    if (keyword.value.trim()) params.keyword = keyword.value.trim()
+    if (filterTenant.value) params.tenant_id = filterTenant.value
     if (filterRole.value) params.role = filterRole.value
     if (filterStatus.value) params.status = filterStatus.value
     const data = await http.get('/api/devices', { params })
     list.value = data.items || []
+    total.value = data.total || 0
   } finally {
     loading.value = false
   }

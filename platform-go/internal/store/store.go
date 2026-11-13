@@ -282,25 +282,38 @@ func (s *Store) GetSessionSeq(ctx context.Context, userID int64, clientType stri
 	return seq, err
 }
 
-// ListUsers 用户列表，tenantID<=0 表示全部（超管）。
-func (s *Store) ListUsers(ctx context.Context, tenantID int64) ([]UserView, error) {
-	q := `SELECT u.id, u.tenant_id, COALESCE(t.name,''), u.username, u.role, u.status, u.created_at, u.last_login_at
-		FROM users u LEFT JOIN tenants t ON t.id=u.tenant_id
-		WHERE ($1::bigint IS NULL OR u.tenant_id=$1) ORDER BY u.id`
-	rows, err := s.DB.QueryContext(ctx, q, tenantArg(tenantID))
+// ListUsers 用户列表（分页）：tenantID>0 指定租户、0 全部（超管）、<0 仅平台账号（tenant_id 为空），
+// keyword 对 username 做 ILIKE 模糊匹配。
+func (s *Store) ListUsers(ctx context.Context, tenantID int64, keyword string, page, size int) ([]UserView, int64, error) {
+	q := ` FROM users u LEFT JOIN tenants t ON t.id=u.tenant_id WHERE ($1::bigint IS NULL OR u.tenant_id=$1)`
+	args := []any{tenantArg(tenantID)}
+	if tenantID < 0 {
+		q = ` FROM users u LEFT JOIN tenants t ON t.id=u.tenant_id WHERE (u.tenant_id IS NULL OR u.tenant_id=0)`
+		args = nil
+	}
+	if keyword != "" {
+		args = append(args, "%"+keyword+"%")
+		q += fmt.Sprintf(` AND u.username ILIKE $%d`, len(args))
+	}
+	var total int64
+	if err := s.DB.QueryRowContext(ctx, `SELECT count(*)`+q, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.DB.QueryContext(ctx, `SELECT u.id, u.tenant_id, COALESCE(t.name,''), u.username, u.role, u.status, u.created_at, u.last_login_at`+
+		q+fmt.Sprintf(` ORDER BY u.id LIMIT %d OFFSET %d`, size, (page-1)*size), args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 	var out []UserView
 	for rows.Next() {
 		var v UserView
 		if err := rows.Scan(&v.ID, &v.TenantID, &v.TenantName, &v.Username, &v.Role, &v.Status, &v.CreatedAt, &v.LastLoginAt); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		out = append(out, v)
 	}
-	return out, rows.Err()
+	return out, total, rows.Err()
 }
 
 // CreateUser 新建用户。
@@ -354,14 +367,24 @@ func (s *Store) GetUserByID(ctx context.Context, id int64) (*User, error) {
 
 // ---------- 租户 ----------
 
-// ListTenants 租户列表（仅超管）。
-func (s *Store) ListTenants(ctx context.Context) ([]map[string]any, error) {
+// ListTenants 租户列表（仅超管，分页），keyword 对 name/code 做 ILIKE 模糊匹配。
+func (s *Store) ListTenants(ctx context.Context, keyword string, page, size int) ([]map[string]any, int64, error) {
+	q := ` FROM tenants t LEFT JOIN plans p ON p.id=t.plan_id`
+	var args []any
+	if keyword != "" {
+		args = append(args, "%"+keyword+"%")
+		q += fmt.Sprintf(` WHERE (t.name ILIKE $%d OR t.code ILIKE $%d)`, len(args), len(args))
+	}
+	var total int64
+	if err := s.DB.QueryRowContext(ctx, `SELECT count(*)`+q, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
 	rows, err := s.DB.QueryContext(ctx, `SELECT t.id, t.name, t.code, t.plan_id, COALESCE(p.name,''), t.status, t.created_at,
 		(SELECT count(*) FROM devices d WHERE d.tenant_id=t.id),
-		(SELECT count(*) FROM users u WHERE u.tenant_id=t.id)
-		FROM tenants t LEFT JOIN plans p ON p.id=t.plan_id ORDER BY t.id`)
+		(SELECT count(*) FROM users u WHERE u.tenant_id=t.id)`+
+		q+fmt.Sprintf(` ORDER BY t.id LIMIT %d OFFSET %d`, size, (page-1)*size), args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 	var out []map[string]any
@@ -371,14 +394,14 @@ func (s *Store) ListTenants(ctx context.Context) ([]map[string]any, error) {
 		var createdAt time.Time
 		var devCount, userCount int64
 		if err := rows.Scan(&id, &name, &code, &planID, &planName, &status, &createdAt, &devCount, &userCount); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		out = append(out, map[string]any{
 			"id": id.Int64, "name": name, "code": code, "device_count": devCount, "user_count": userCount,
 			"plan_id": planID.Int64, "plan_name": planName, "status": status, "created_at": createdAt,
 		})
 	}
-	return out, rows.Err()
+	return out, total, rows.Err()
 }
 
 // CreateTenant 新建租户。
@@ -442,12 +465,20 @@ func scanDevice(row *sql.Row) (*Device, error) {
 	return &d, nil
 }
 
-// ListDevices 设备列表（含端口数），tenantID<=0 表示全部。
-func (s *Store) ListDevices(ctx context.Context, tenantID int64, role, status string) ([]DeviceView, error) {
-	q := `SELECT d.id, d.tenant_id, d.device_uid, d.name, d.role, d.status, d.owner, d.os_info, d.last_online_at, d.created_at,
-		(SELECT count(*) FROM device_ports p WHERE p.device_id=d.id AND p.declared), COALESCE(t.name,'')
-		FROM devices d LEFT JOIN tenants t ON t.id=d.tenant_id WHERE ($1::bigint IS NULL OR d.tenant_id=$1)`
+// ListDevices 设备列表（含端口数，分页）：tenantID>0 指定租户、0 全部、<0 仅平台设备（tenant_id 为空），
+// keyword 对 name/device_uid/owner/tenant_name 做 ILIKE 模糊匹配。
+func (s *Store) ListDevices(ctx context.Context, tenantID int64, keyword, role, status string, page, size int) ([]DeviceView, int64, error) {
+	q := ` FROM devices d LEFT JOIN tenants t ON t.id=d.tenant_id WHERE ($1::bigint IS NULL OR d.tenant_id=$1)`
 	args := []any{tenantArg(tenantID)}
+	if tenantID < 0 {
+		q = ` FROM devices d LEFT JOIN tenants t ON t.id=d.tenant_id WHERE d.tenant_id IS NULL`
+		args = nil
+	}
+	if keyword != "" {
+		args = append(args, "%"+keyword+"%")
+		q += fmt.Sprintf(` AND (d.name ILIKE $%d OR d.device_uid ILIKE $%d OR d.owner ILIKE $%d OR t.name ILIKE $%d)`,
+			len(args), len(args), len(args), len(args))
+	}
 	if role != "" {
 		args = append(args, role)
 		q += fmt.Sprintf(` AND d.role=$%d`, len(args))
@@ -456,10 +487,15 @@ func (s *Store) ListDevices(ctx context.Context, tenantID int64, role, status st
 		args = append(args, status)
 		q += fmt.Sprintf(` AND d.status=$%d`, len(args))
 	}
-	q += ` ORDER BY d.id DESC`
-	rows, err := s.DB.QueryContext(ctx, q, args...)
+	var total int64
+	if err := s.DB.QueryRowContext(ctx, `SELECT count(*)`+q, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.DB.QueryContext(ctx, `SELECT d.id, d.tenant_id, d.device_uid, d.name, d.role, d.status, d.owner, d.os_info, d.last_online_at, d.created_at,
+		(SELECT count(*) FROM device_ports p WHERE p.device_id=d.id AND p.declared), COALESCE(t.name,'')`+
+		q+fmt.Sprintf(` ORDER BY d.id DESC LIMIT %d OFFSET %d`, size, (page-1)*size), args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 	var out []DeviceView
@@ -467,11 +503,11 @@ func (s *Store) ListDevices(ctx context.Context, tenantID int64, role, status st
 		var v DeviceView
 		if err := rows.Scan(&v.ID, &v.TenantID, &v.DeviceUID, &v.Name, &v.Role, &v.Status, &v.Owner, &v.OSInfo,
 			&v.LastOnlineAt, &v.CreatedAt, &v.PortCount, &v.TenantName); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		out = append(out, v)
 	}
-	return out, rows.Err()
+	return out, total, rows.Err()
 }
 
 // CreateDevice 新建设备（owner 为归属账号）。
@@ -683,28 +719,32 @@ func (s *Store) InsertAlert(ctx context.Context, tenantID sql.NullInt64, level, 
 	return err
 }
 
-// ListAlerts 告警列表。
-func (s *Store) ListAlerts(ctx context.Context, tenantID int64, unreadOnly bool) ([]Alert, error) {
-	q := `SELECT al.id, al.tenant_id, COALESCE(t.name,''), al.level, al.title, al.detail, al.is_read, al.created_at
-		FROM alerts al LEFT JOIN tenants t ON t.id=al.tenant_id WHERE ($1::bigint IS NULL OR al.tenant_id=$1)`
+// ListAlerts 告警列表（分页）。
+func (s *Store) ListAlerts(ctx context.Context, tenantID int64, unreadOnly bool, page, size int) ([]Alert, int64, error) {
+	q := ` FROM alerts al LEFT JOIN tenants t ON t.id=al.tenant_id WHERE ($1::bigint IS NULL OR al.tenant_id=$1)`
+	args := []any{tenantArg(tenantID)}
 	if unreadOnly {
-		q += ` AND is_read=FALSE`
+		q += ` AND al.is_read=FALSE`
 	}
-	q += ` ORDER BY id DESC LIMIT 100`
-	rows, err := s.DB.QueryContext(ctx, q, tenantArg(tenantID))
+	var total int64
+	if err := s.DB.QueryRowContext(ctx, `SELECT count(*)`+q, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.DB.QueryContext(ctx, `SELECT al.id, al.tenant_id, COALESCE(t.name,''), al.level, al.title, al.detail, al.is_read, al.created_at`+
+		q+fmt.Sprintf(` ORDER BY al.id DESC LIMIT %d OFFSET %d`, size, (page-1)*size), args...)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 	var out []Alert
 	for rows.Next() {
 		var a Alert
 		if err := rows.Scan(&a.ID, &a.TenantID, &a.TenantName, &a.Level, &a.Title, &a.Detail, &a.IsRead, &a.CreatedAt); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		out = append(out, a)
 	}
-	return out, rows.Err()
+	return out, total, rows.Err()
 }
 
 // MarkAlertRead 标记告警已读。

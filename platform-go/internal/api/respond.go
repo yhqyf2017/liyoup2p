@@ -54,6 +54,22 @@ func QueryInt(r *http.Request, key string, def int) int {
 	return n
 }
 
+// PageArgs 解析分页查询参数：page 默认 1；page_size 默认 20、上限 100。
+func PageArgs(r *http.Request) (page, size int) {
+	page = QueryInt(r, "page", 1)
+	size = QueryInt(r, "page_size", 20)
+	if page < 1 {
+		page = 1
+	}
+	if size < 1 {
+		size = 20
+	}
+	if size > 100 {
+		size = 100
+	}
+	return page, size
+}
+
 // ClientIP 取客户端 IP。
 func ClientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)

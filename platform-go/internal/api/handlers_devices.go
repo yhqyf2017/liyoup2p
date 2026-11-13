@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"liyou-platform/internal/auth"
 	"liyou-platform/internal/store"
@@ -24,10 +25,13 @@ type DevicesAPI struct {
 	Kicker DeviceKicker // 可为 nil
 }
 
-// List 设备列表。
+// List 设备列表（分页，支持 keyword/tenant_id/role/status 筛选）。
 func (a *DevicesAPI) List(w http.ResponseWriter, r *http.Request) {
 	u := CurrentUser(r)
-	devices, err := a.St.ListDevices(r.Context(), tenantScope(r, u), r.URL.Query().Get("role"), r.URL.Query().Get("status"))
+	page, size := PageArgs(r)
+	keyword := strings.TrimSpace(r.URL.Query().Get("keyword"))
+	devices, total, err := a.St.ListDevices(r.Context(), tenantScope(r, u), keyword,
+		r.URL.Query().Get("role"), r.URL.Query().Get("status"), page, size)
 	if err != nil {
 		Fail(w, http.StatusInternalServerError, 5000, "查询设备失败: "+err.Error())
 		return
@@ -41,7 +45,7 @@ func (a *DevicesAPI) List(w http.ResponseWriter, r *http.Request) {
 			"last_online_at": d.LastOnlineAt, "created_at": d.CreatedAt,
 		})
 	}
-	OK(w, map[string]any{"items": items, "total": len(items)})
+	OK(w, map[string]any{"items": items, "total": total})
 }
 
 type registerDeviceRequest struct {

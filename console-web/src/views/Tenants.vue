@@ -24,7 +24,7 @@
 
     <div class="page-card table-card">
 
-      <el-table v-loading="loading" :data="pagedList" height="100%" style="width: 100%">
+      <el-table v-loading="loading" :data="list" height="100%" style="width: 100%">
         <el-table-column label="ID" prop="id" sortable width="90" align="center">
           <template #default="{ row }"><span class="num">{{ row.id }}</span></template>
         </el-table-column>
@@ -67,11 +67,13 @@
       <el-pagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
-        :total="filteredList.length"
+        :total="total"
         :page-sizes="[10, 20, 50, 100]"
         layout="total, sizes, prev, pager, next, jumper"
         background
         class="table-pager"
+        @current-change="load"
+        @size-change="onSizeChange"
       />
     </div>
 
@@ -104,40 +106,39 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import http from '../api'
 import { fmtTime } from '../utils'
 
 const list = ref([])
+const total = ref(0)
 const loading = ref(false)
 const keyword = ref('')
 
-const filteredList = computed(() => {
-  const kw = keyword.value.trim().toLowerCase()
-  if (!kw) return list.value
-  return list.value.filter((t) => `${t.name} ${t.code}`.toLowerCase().includes(kw))
-})
-
-// 前端分页
 const page = ref(1)
 const pageSize = ref(20)
-const pagedList = computed(() => {
-  const start = (page.value - 1) * pageSize.value
-  return filteredList.value.slice(start, start + pageSize.value)
+
+// 关键词变化：回到第 1 页并重新请求后端
+watch(keyword, () => {
+  page.value = 1
+  load()
 })
 
-// 过滤条件变化时回到第 1 页
-watch([keyword, pageSize], () => {
+function onSizeChange() {
   page.value = 1
-})
+  load()
+}
 
 async function load() {
   loading.value = true
   try {
-    const data = await http.get('/api/tenants')
+    const params = { page: page.value, page_size: pageSize.value }
+    if (keyword.value.trim()) params.keyword = keyword.value.trim()
+    const data = await http.get('/api/tenants', { params })
     list.value = data.items || []
+    total.value = data.total || 0
   } finally {
     loading.value = false
   }

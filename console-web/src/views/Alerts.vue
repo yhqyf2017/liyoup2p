@@ -18,7 +18,7 @@
 
     <div class="page-card table-card">
 
-      <el-table v-loading="loading" :data="pagedList" height="100%" style="width: 100%" :row-class-name="rowClass">
+      <el-table v-loading="loading" :data="items" height="100%" style="width: 100%" :row-class-name="rowClass">
         <el-table-column label="级别" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="ALERT_LEVEL_TAG_TYPES[row.level] || 'info'" size="small" effect="light">
@@ -64,18 +64,20 @@
       <el-pagination
         v-model:current-page="page"
         v-model:page-size="pageSize"
-        :total="items.length"
+        :total="total"
         :page-sizes="[10, 20, 50, 100]"
         layout="total, sizes, prev, pager, next, jumper"
         background
         class="table-pager"
+        @current-change="load"
+        @size-change="onSizeChange"
       />
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import http, { refreshAlertUnread } from '../api'
@@ -87,19 +89,16 @@ const total = ref(0)
 const loading = ref(false)
 const readAllLoading = ref(false)
 
-const unreadCount = computed(() => items.value.filter((a) => !a.is_read).length)
-
-// 前端分页（/api/alerts 一次返回全量列表）
 const page = ref(1)
 const pageSize = ref(20)
-const pagedList = computed(() => {
-  const start = (page.value - 1) * pageSize.value
-  return items.value.slice(start, start + pageSize.value)
-})
 
-watch(pageSize, () => {
+// 未读数取全局徽标值（顶栏与后端统计一致），而非当前页数据
+const unreadCount = computed(() => store.alertUnread)
+
+function onSizeChange() {
   page.value = 1
-})
+  load()
+}
 
 function rowClass({ row }) {
   return row.is_read ? 'row-read' : ''
@@ -108,10 +107,10 @@ function rowClass({ row }) {
 async function load() {
   loading.value = true
   try {
-    const data = await http.get('/api/alerts')
+    const data = await http.get('/api/alerts', { params: { page: page.value, page_size: pageSize.value } })
     items.value = data.items || []
     total.value = data.total || 0
-    store.alertUnread = items.value.filter((a) => !a.is_read).length
+    refreshAlertUnread()
   } finally {
     loading.value = false
   }

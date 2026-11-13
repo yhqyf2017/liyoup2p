@@ -67,11 +67,12 @@ func (a *MiscAPI) Sessions(w http.ResponseWriter, r *http.Request) {
 	OK(w, map[string]any{"items": items, "total": len(items)})
 }
 
-// Alerts 告警列表。
+// Alerts 告警列表（分页）。
 func (a *MiscAPI) Alerts(w http.ResponseWriter, r *http.Request) {
 	u := CurrentUser(r)
 	unread := r.URL.Query().Get("unread") == "1"
-	alerts, err := a.St.ListAlerts(r.Context(), tenantScope(r, u), unread)
+	page, size := PageArgs(r)
+	alerts, total, err := a.St.ListAlerts(r.Context(), tenantScope(r, u), unread, page, size)
 	if err != nil {
 		Fail(w, http.StatusInternalServerError, 5000, "查询告警失败: "+err.Error())
 		return
@@ -84,7 +85,7 @@ func (a *MiscAPI) Alerts(w http.ResponseWriter, r *http.Request) {
 			"created_at": al.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
-	OK(w, map[string]any{"items": items, "total": len(items)})
+	OK(w, map[string]any{"items": items, "total": total})
 }
 
 // AlertRead 标记单条告警已读。
