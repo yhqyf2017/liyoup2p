@@ -249,18 +249,18 @@ onMounted(loadAll)
   flex: 1;
   font-size: 14px;
   font-weight: 600;
-  color: #16233c;
+  color: var(--app-text-1);
 }
 
 .ch-icon {
-  color: #1667c8;
+  color: var(--app-brand);
 }
 
 .ch-version {
   margin: 10px 0 6px;
   font-size: 26px;
   font-weight: 700;
-  color: #1667c8;
+  color: var(--app-brand);
   letter-spacing: 0.5px;
 }
 
@@ -276,7 +276,7 @@ onMounted(loadAll)
 .ch-label {
   flex-shrink: 0;
   width: 60px;
-  color: #8c99ae;
+  color: var(--app-text-3);
 }
 
 .ch-url {
@@ -284,7 +284,7 @@ onMounted(loadAll)
 }
 
 .ch-notes-text {
-  color: #57677f;
+  color: var(--app-text-2);
 }
 
 .upload-card {
@@ -294,7 +294,7 @@ onMounted(loadAll)
 .uc-title {
   font-size: 14px;
   font-weight: 600;
-  color: #16233c;
+  color: var(--app-text-1);
   margin-bottom: 12px;
 }
 
@@ -309,7 +309,7 @@ onMounted(loadAll)
 }
 
 .up-icon {
-  color: #a8b6c9;
+  color: var(--app-text-3);
   margin-bottom: 8px;
 }
 

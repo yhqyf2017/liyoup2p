@@ -25,10 +25,10 @@
     <div class="page-card table-card">
 
       <el-table v-loading="loading" :data="filteredList" style="width: 100%">
-        <el-table-column label="ID" width="70" align="center">
+        <el-table-column label="ID" prop="id" sortable width="90" align="center">
           <template #default="{ row }"><span class="num">{{ row.id }}</span></template>
         </el-table-column>
-        <el-table-column label="租户名称" prop="name" min-width="160" show-overflow-tooltip />
+        <el-table-column label="租户名称" prop="name" sortable min-width="160" show-overflow-tooltip />
         <el-table-column label="租户编码" min-width="130">
           <template #default="{ row }"><span class="mono">{{ row.code }}</span></template>
         </el-table-column>
@@ -38,10 +38,10 @@
             <span v-else class="none-text">未设置</span>
           </template>
         </el-table-column>
-        <el-table-column label="设备数" width="90" align="center">
+        <el-table-column label="设备数" prop="device_count" sortable width="95" align="center">
           <template #default="{ row }"><span class="num">{{ row.device_count }}</span></template>
         </el-table-column>
-        <el-table-column label="成员数" width="90" align="center">
+        <el-table-column label="成员数" prop="user_count" sortable width="95" align="center">
           <template #default="{ row }"><span class="num">{{ row.user_count }}</span></template>
         </el-table-column>
         <el-table-column label="状态" width="100" align="center">
@@ -51,7 +51,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="创建时间" width="150">
+        <el-table-column label="创建时间" prop="created_at" sortable width="155">
           <template #default="{ row }"><span class="num">{{ fmtTime(row.created_at) }}</span></template>
         </el-table-column>
         <el-table-column label="操作" width="140" fixed="right" align="center">
@@ -193,23 +193,23 @@ onMounted(load)
 .table-foot {
   padding: var(--sp-2) var(--sp-2) 0;
   font-size: 12.5px;
-  color: #8C99AE;
+  color: var(--app-text-3);
 }
 
 .mono {
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: 12.5px;
-  color: #57677F;
+  color: var(--app-text-2);
 }
 
 .none-text {
-  color: #8C99AE;
+  color: var(--app-text-3);
   font-size: 12.5px;
 }
 
 .plan-tip {
   margin-left: 10px;
   font-size: 12px;
-  color: #8C99AE;
+  color: var(--app-text-3);
 }
 </style>

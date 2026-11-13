@@ -54,7 +54,7 @@
         <el-table-column label="账号" prop="client_owner" min-width="110" show-overflow-tooltip>
           <template #default="{ row }">{{ row.client_owner || '—' }}</template>
         </el-table-column>
-        <el-table-column label="端口" width="80" align="center">
+        <el-table-column label="端口" prop="port" sortable width="90" align="center">
           <template #default="{ row }"><span class="num">{{ row.port }}</span></template>
         </el-table-column>
         <el-table-column label="模式" width="110" align="center">
@@ -71,10 +71,10 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="中继流量" width="110" align="right">
+        <el-table-column label="中继流量" prop="relay_bytes" sortable width="120" align="right">
           <template #default="{ row }"><span class="num">{{ fmtBytes(row.relay_bytes) }}</span></template>
         </el-table-column>
-        <el-table-column label="开始时间" width="150">
+        <el-table-column label="开始时间" prop="started_at" sortable width="160">
           <template #default="{ row }"><span class="num">{{ fmtTime(row.started_at) }}</span></template>
         </el-table-column>
         <template #empty>
@@ -103,32 +103,32 @@ const kpiCards = computed(() => {
       value: `${s.online_devices ?? 0} / ${s.total_devices ?? 0}`,
       sub: '当前在线 / 总设备数',
       icon: 'Monitor',
-      iconBg: '#E8F1FC',
-      iconColor: '#1667C8',
+      iconBg: 'rgba(62, 139, 255, 0.14)',
+      iconColor: '#5CA0FF',
     },
     {
       label: '今日请求',
       value: s.today_requests ?? 0,
       sub: '今日连接请求总数',
       icon: 'DataLine',
-      iconBg: '#E6F6EF',
-      iconColor: '#1E9E63',
+      iconBg: 'rgba(30, 158, 99, 0.16)',
+      iconColor: '#2FBF83',
     },
     {
       label: '直连率',
       value: `${s.p2p_rate ?? 0}%`,
       sub: `今日会话 ${s.today_sessions ?? 0} 次`,
       icon: 'Connection',
-      iconBg: '#FDF3E4',
-      iconColor: '#B97A0D',
+      iconBg: 'rgba(240, 166, 35, 0.16)',
+      iconColor: '#F5A623',
     },
     {
       label: '中继流量',
       value: fmtBytes(s.relay_bytes ?? 0),
       sub: '今日中继转发流量',
       icon: 'Histogram',
-      iconBg: '#F0EBFB',
-      iconColor: '#6C4FC4',
+      iconBg: 'rgba(124, 92, 255, 0.16)',
+      iconColor: '#9B7BFF',
     },
   ]
 })
@@ -179,21 +179,25 @@ onMounted(() => {
 
 .kpi-label {
   font-size: 13px;
-  color: #57677F;
+  color: var(--app-text-2);
   margin-bottom: var(--sp-2);
 }
 
 .kpi-value {
   font-size: 26px;
   font-weight: 700;
-  color: #16233C;
   line-height: 1.3;
   margin: 0 0 var(--sp-1);
+  background: var(--app-brand-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 .kpi-sub {
   font-size: 12px;
-  color: #8C99AE;
+  color: var(--app-text-3);
 }
 
 .table-card {
@@ -210,18 +214,18 @@ onMounted(() => {
 .mono {
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: 12.5px;
-  color: #57677F;
+  color: var(--app-text-2);
 }
 
 .dev-name {
   display: block;
-  color: #16233C;
+  color: var(--app-text-1);
 }
 
 .cell-uid {
   display: block;
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: 11px;
-  color: #8C99AE;
+  color: var(--app-text-3);
 }
 </style>

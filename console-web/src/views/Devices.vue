@@ -39,15 +39,15 @@
         <el-table-column label="设备 UID" prop="device_uid" min-width="160">
           <template #default="{ row }"><span class="mono">{{ row.device_uid }}</span></template>
         </el-table-column>
-        <el-table-column label="设备名称" prop="name" min-width="150" show-overflow-tooltip />
-        <el-table-column label="角色" width="90" align="center">
+        <el-table-column label="设备名称" prop="name" sortable min-width="150" show-overflow-tooltip />
+        <el-table-column label="角色" width="95" align="center" sortable sort-by="role">
           <template #default="{ row }">
             <el-tag :type="row.role === 'server' ? 'primary' : 'success'" size="small" effect="light">
               {{ DEVICE_ROLE_LABELS[row.role] || row.role }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="状态" width="90" align="center">
+        <el-table-column label="状态" width="95" align="center" sortable sort-by="status">
           <template #default="{ row }">
             <el-tag :type="DEVICE_STATUS_TAG_TYPES[row.status] || 'info'" size="small" effect="light">
               {{ DEVICE_STATUS_LABELS[row.status] || row.status }}
@@ -64,10 +64,10 @@
         <el-table-column label="端口数" width="80" align="center">
           <template #default="{ row }"><span class="num">{{ row.port_count }}</span></template>
         </el-table-column>
-        <el-table-column label="最近在线" width="150">
+        <el-table-column label="最近在线" prop="last_online_at" sortable width="155">
           <template #default="{ row }"><span class="num">{{ fmtTime(row.last_online_at) }}</span></template>
         </el-table-column>
-        <el-table-column label="注册时间" width="150">
+        <el-table-column label="注册时间" prop="created_at" sortable width="155">
           <template #default="{ row }"><span class="num">{{ fmtTime(row.created_at) }}</span></template>
         </el-table-column>
         <el-table-column v-if="canOperateDevices()" label="操作" width="90" fixed="right" align="center">
@@ -287,13 +287,13 @@ onMounted(load)
 .table-foot {
   padding: var(--sp-2) var(--sp-2) 0;
   font-size: 12.5px;
-  color: #8C99AE;
+  color: var(--app-text-3);
 }
 
 .mono {
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: 12.5px;
-  color: #57677F;
+  color: var(--app-text-2);
 }
 
 .token-alert {
@@ -317,20 +317,20 @@ onMounted(load)
 }
 
 .revoke-icon {
-  color: #E64340;
+  color: var(--app-danger);
   flex-shrink: 0;
   margin-top: 2px;
 }
 
 .revoke-line {
   margin: 0 0 8px;
-  color: #16233C;
+  color: var(--app-text-1);
   font-size: 14px;
 }
 
 .revoke-sub {
   margin: 0;
-  color: #8C99AE;
+  color: var(--app-text-3);
   font-size: 12.5px;
   line-height: 1.6;
 }

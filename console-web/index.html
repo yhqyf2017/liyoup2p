@@ -5,6 +5,16 @@
     <link rel="icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>励联 LiLink 管理控制台</title>
+    <script>
+      // 主题预置：默认暗黑，避免首帧白闪（与 src/theme.js 约定一致）
+      (function () {
+        var t = localStorage.getItem('console-theme')
+        var light = t === 'light'
+        var el = document.documentElement
+        el.classList.toggle('light', light)
+        el.classList.toggle('dark', !light)
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>

@@ -51,6 +51,11 @@
       <header class="layout-header">
         <div class="header-title">{{ route.meta.title }}</div>
         <div class="header-actions">
+          <el-tooltip content="切换主题" placement="bottom">
+            <el-button text class="bell-btn" @click="toggleTheme">
+              <el-icon :size="18"><Sunny v-if="theme === 'dark'" /><Moon v-else /></el-icon>
+            </el-button>
+          </el-tooltip>
           <el-badge :value="store.alertUnread" :hidden="!store.alertUnread" :max="99" class="bell-badge">
             <el-button text class="bell-btn" @click="goAlerts">
               <el-icon :size="18"><Bell /></el-icon>
@@ -78,15 +83,25 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import { store, clearAuth, ROLE_LABELS, ROLE_TAG_TYPES } from '../store'
 import { refreshAlertUnread } from '../api'
+import { getTheme, setTheme } from '../theme'
 import Logo from '../components/Logo.vue'
 
 const route = useRoute()
 const router = useRouter()
+
+// 主题切换：默认暗黑（Sunny 表示当前暗黑、点击切浅色）
+const theme = ref(getTheme())
+
+function toggleTheme() {
+  const next = theme.value === 'dark' ? 'light' : 'dark'
+  setTheme(next)
+  theme.value = next
+}
 
 const activePath = computed(() => route.path)
 const superRole = computed(() => !!store.user && store.user.role === 'super_admin')
@@ -131,8 +146,8 @@ function logout() {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  background: #F8FAFD;
-  border-right: 1px solid #E3E8F0;
+  background: var(--app-surface-2);
+  border-right: 1px solid var(--app-border);
 }
 
 .aside-brand {
@@ -140,7 +155,7 @@ function logout() {
   align-items: center;
   gap: 10px;
   padding: 16px 18px;
-  border-bottom: 1px solid #E3E8F0;
+  border-bottom: 1px solid var(--app-border);
 }
 
 .brand-text {
@@ -150,13 +165,13 @@ function logout() {
 .brand-name {
   font-size: 15px;
   font-weight: 700;
-  color: #16233C;
+  color: var(--app-text-1);
   letter-spacing: 0.5px;
 }
 
 .brand-sub {
   font-size: 12px;
-  color: #8C99AE;
+  color: var(--app-text-3);
 }
 
 .layout-menu {
@@ -165,6 +180,8 @@ function logout() {
   background: transparent;
   border-right: none;
   padding: 8px 0;
+  --el-menu-bg-color: transparent;
+  --el-menu-hover-bg-color: transparent;
 }
 
 .layout-menu :deep(.el-menu-item) {
@@ -173,33 +190,33 @@ function logout() {
   margin: 2px 10px;
   padding: 0 var(--sp-3);
   border-radius: 6px;
-  color: #16233C;
+  color: var(--app-text-1);
   font-size: 13.5px;
   transition: background-color 0.18s ease, color 0.18s ease;
 }
 
 .layout-menu :deep(.el-menu-item .el-icon) {
-  color: #57677F;
+  color: var(--app-text-2);
   transition: color 0.18s ease;
 }
 
 .layout-menu :deep(.el-menu-item:hover) {
-  background: #EEF3FA;
-  color: #16233C;
+  background: var(--app-menu-hover-bg);
+  color: var(--app-text-1);
 }
 
 .layout-menu :deep(.el-menu-item.is-active) {
   position: relative;
-  background: #E8F1FC;
-  color: #1667C8;
+  background: var(--app-menu-active-bg);
+  color: var(--app-brand);
   font-weight: 600;
 }
 
 .layout-menu :deep(.el-menu-item.is-active .el-icon) {
-  color: #1667C8;
+  color: var(--app-brand);
 }
 
-/* 选中项左侧 3px 蓝条 */
+/* 选中项左侧 3px 品牌渐变指示条 */
 .layout-menu :deep(.el-menu-item.is-active::before) {
   content: '';
   position: absolute;
@@ -208,21 +225,21 @@ function logout() {
   bottom: 9px;
   width: 3px;
   border-radius: 2px;
-  background: #1667C8;
+  background: var(--app-brand-grad);
 }
 
 .menu-group-title {
   padding: var(--sp-4) 22px 6px;
   font-size: 12px;
-  color: #8C99AE;
+  color: var(--app-text-3);
   letter-spacing: 1px;
 }
 
 .aside-footer {
   padding: 12px 18px;
   font-size: 12px;
-  color: #8C99AE;
-  border-top: 1px solid #E3E8F0;
+  color: var(--app-text-3);
+  border-top: 1px solid var(--app-border);
 }
 
 .layout-right {
@@ -239,14 +256,14 @@ function logout() {
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
-  background: #FFFFFF;
-  border-bottom: 1px solid #E3E8F0;
+  background: var(--app-surface);
+  border-bottom: 1px solid var(--app-border);
 }
 
 .header-title {
   font-size: 15px;
   font-weight: 600;
-  color: #16233C;
+  color: var(--app-text-1);
 }
 
 .header-actions {
@@ -257,12 +274,12 @@ function logout() {
 
 .bell-btn {
   padding: 6px;
-  color: #57677F;
+  color: var(--app-text-2);
 }
 
 .header-user {
   font-size: 13.5px;
-  color: #16233C;
+  color: var(--app-text-1);
   font-weight: 500;
 }
 

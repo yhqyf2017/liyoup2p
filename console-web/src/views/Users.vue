@@ -28,10 +28,10 @@
 
       <!-- 后端 UserView 无 JSON tag，字段为 PascalCase：ID / TenantID{Int64,Valid} / TenantName / Username / Role / Status / CreatedAt / LastLoginAt{Time,Valid} -->
       <el-table v-loading="loading" :data="filteredList" style="width: 100%" :span-method="tenantSpanMethod">
-        <el-table-column label="ID" width="70" align="center">
+        <el-table-column label="ID" prop="ID" sortable width="90" align="center">
           <template #default="{ row }"><span class="num">{{ row.ID }}</span></template>
         </el-table-column>
-        <el-table-column label="用户名" prop="Username" min-width="130">
+        <el-table-column label="用户名" prop="Username" sortable min-width="130">
           <template #default="{ row }">
             <span class="username">{{ row.Username }}</span>
             <el-tag v-if="isSelf(row)" size="small" effect="plain" class="self-tag">当前账号</el-tag>
@@ -54,10 +54,10 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="创建时间" width="150">
+        <el-table-column label="创建时间" prop="CreatedAt" sortable width="155">
           <template #default="{ row }"><span class="num">{{ fmtTime(row.CreatedAt) }}</span></template>
         </el-table-column>
-        <el-table-column label="最近登录" width="150">
+        <el-table-column label="最近登录" prop="LastLoginAt" sortable width="155">
           <template #default="{ row }"><span class="num">{{ fmtTime(row.LastLoginAt) }}</span></template>
         </el-table-column>
         <el-table-column v-if="canWriteUsers()" label="操作" width="200" fixed="right" align="center">
@@ -331,11 +331,11 @@ onMounted(load)
 .table-foot {
   padding: var(--sp-2) var(--sp-2) 0;
   font-size: 12.5px;
-  color: #8C99AE;
+  color: var(--app-text-3);
 }
 
 .username {
-  color: #16233C;
+  color: var(--app-text-1);
   font-weight: 500;
 }
 

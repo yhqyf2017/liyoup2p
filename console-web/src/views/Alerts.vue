@@ -39,7 +39,7 @@
         <el-table-column label="告警详情" min-width="260" show-overflow-tooltip>
           <template #default="{ row }">{{ row.detail || '—' }}</template>
         </el-table-column>
-        <el-table-column label="发生时间" width="160">
+        <el-table-column label="发生时间" prop="created_at" sortable width="165">
           <template #default="{ row }"><span class="num">{{ fmtTime(row.created_at) }}</span></template>
         </el-table-column>
         <el-table-column label="状态" width="90" align="center">
@@ -124,12 +124,12 @@ onMounted(load)
 }
 
 .unread-count {
-  color: #E64340;
+  color: var(--app-danger);
   font-weight: 700;
 }
 
 .alert-title {
-  color: #16233C;
+  color: var(--app-text-1);
   font-weight: 500;
   display: inline-flex;
   align-items: center;
@@ -140,15 +140,15 @@ onMounted(load)
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #E64340;
+  background: var(--app-danger);
   flex-shrink: 0;
 }
 
 .read-done {
-  color: #C0C9D8;
+  color: var(--app-text-3);
 }
 
 :deep(.row-read) {
-  color: #8C99AE;
+  color: var(--app-text-3);
 }
 </style>

@@ -24,7 +24,7 @@
         <el-table-column label="ID" prop="id" width="70" align="center">
           <template #default="{ row }"><span class="num">{{ row.id }}</span></template>
         </el-table-column>
-        <el-table-column label="时间" width="160">
+        <el-table-column label="时间" prop="created_at" sortable width="165">
           <template #default="{ row }"><span class="num">{{ fmtTime(row.created_at) }}</span></template>
         </el-table-column>
         <el-table-column label="动作" width="90" align="center">
@@ -120,6 +120,6 @@ onMounted(load)
 .mono {
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: 12.5px;
-  color: #57677F;
+  color: var(--app-text-2);
 }
 </style>

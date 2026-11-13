@@ -155,7 +155,7 @@ async function submit() {
 .glow-a {
   width: 420px;
   height: 420px;
-  background: #2AA4E9;
+  background: #3E8BFF;
   top: -120px;
   left: -100px;
 }
@@ -163,7 +163,7 @@ async function submit() {
 .glow-b {
   width: 360px;
   height: 360px;
-  background: #0F51A8;
+  background: #00A6D8;
   bottom: -120px;
   right: -80px;
 }
@@ -223,24 +223,28 @@ async function submit() {
   font-size: 18px;
 }
 
-/* 右侧表单区 */
+/* 右侧表单区：跟随主题（暗黑 = 深底 + 渐变光斑，浅色 = 灰白底） */
 .form-side {
   flex: 1;
   min-width: 420px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #F3F5F9;
+  background-color: var(--app-bg);
+  background-image: var(--app-bg-glow);
+  background-attachment: fixed;
   padding: 24px;
 }
 
 .login-card {
   width: 400px;
   max-width: 100%;
-  background: #FFFFFF;
-  border: 1px solid #E3E8F0;
-  border-radius: 10px;
-  box-shadow: 0 1px 2px rgba(22, 35, 60, 0.04);
+  background: var(--app-glass-card);
+  border: 1px solid var(--app-border-strong);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   padding: 36px 36px 24px;
 }
 
@@ -252,13 +256,13 @@ async function submit() {
 .login-head h2 {
   font-size: 20px;
   font-weight: 700;
-  color: #16233C;
+  color: var(--app-text-1);
   margin: 12px 0 4px;
 }
 
 .login-head p {
   font-size: 13px;
-  color: #8C99AE;
+  color: var(--app-text-3);
   margin: 0;
 }
 
@@ -276,6 +280,6 @@ async function submit() {
   margin-top: 18px;
   text-align: center;
   font-size: 12px;
-  color: #8C99AE;
+  color: var(--app-text-3);
 }
 </style>

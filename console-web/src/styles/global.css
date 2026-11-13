@@ -1,25 +1,58 @@
-/* 励联 LiLink 管理控制台 - 全局样式（企业级浅色主题） */
+/* 励联 LiLink 管理控制台 - 全局样式
+   主题约定：默认（html 无 light 类）= 暗黑深空蓝科技风；html.light = 浅色。
+   Element Plus 暗黑变量依赖 html.dark（由 src/theme.js 维护）。
+   使用 html:root（0,1,1）覆盖 EP 自带变量，保证晚于 element-plus CSS 导入时生效。 */
 
-:root {
-  /* Element Plus 主色定制 */
-  --el-color-primary: #1667C8;
-  --el-color-primary-light-3: #4A8AD8;
-  --el-color-primary-light-5: #7FABE2;
-  --el-color-primary-light-7: #B3CDEC;
-  --el-color-primary-light-8: #CFE0F4;
-  --el-color-primary-light-9: #E9F1FB;
-  --el-color-primary-dark-2: #0F51A8;
+html:root {
+  color-scheme: dark;
 
-  /* 文字与边框 */
-  --el-text-color-primary: #16233C;
-  --el-text-color-regular: #57677F;
-  --el-text-color-secondary: #8C99AE;
-  --el-text-color-placeholder: #A9B4C6;
-  --el-border-color: #E3E8F0;
-  --el-border-color-light: #E3E8F0;
-  --el-border-color-lighter: #EBF0F7;
-  --el-fill-color-light: #F3F5F9;
-  --el-fill-color-lighter: #F8FAFD;
+  /* 应用语义 token（暗黑 = 默认值） */
+  --app-bg: #0A0F1C;
+  --app-bg-glow: radial-gradient(1200px 500px at 80% -10%, rgba(62, 139, 255, 0.10), transparent 60%),
+    radial-gradient(900px 400px at -10% 110%, rgba(0, 208, 255, 0.07), transparent 55%);
+  --app-surface: #0F172A;
+  --app-surface-2: #16203A;
+  --app-border: rgba(148, 163, 184, 0.16);
+  --app-border-strong: rgba(148, 163, 184, 0.28);
+  --app-text-1: #E7EEF9;
+  --app-text-2: #9AA8C0;
+  --app-text-3: #6B7A94;
+  --app-placeholder: #55637C;
+  --app-brand: #3E8BFF;
+  --app-brand-2: #00D0FF;
+  --app-brand-grad: linear-gradient(135deg, #3E8BFF, #00D0FF);
+  --app-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --app-scrollbar: #2A3A55;
+  --app-scrollbar-hover: #3D5278;
+  --app-glass-card: rgba(15, 23, 42, 0.72);
+  --app-menu-hover-bg: rgba(62, 139, 255, 0.08);
+  --app-menu-active-bg: rgba(62, 139, 255, 0.14);
+  --app-table-hover: rgba(22, 32, 58, 0.55);
+  --app-danger: #FF6B6B;
+
+  /* Element Plus 变量映射（暗黑） */
+  --el-bg-color: var(--app-surface);
+  --el-bg-color-overlay: var(--app-surface-2);
+  --el-bg-color-page: var(--app-bg);
+  --el-border-color: var(--app-border);
+  --el-border-color-light: var(--app-border);
+  --el-border-color-lighter: rgba(148, 163, 184, 0.10);
+  --el-border-color-extra-light: rgba(148, 163, 184, 0.06);
+  --el-text-color-primary: var(--app-text-1);
+  --el-text-color-regular: var(--app-text-2);
+  --el-text-color-secondary: var(--app-text-3);
+  --el-text-color-placeholder: var(--app-placeholder);
+  --el-fill-color: var(--app-surface-2);
+  --el-fill-color-light: var(--app-surface-2);
+  --el-fill-color-lighter: rgba(148, 163, 184, 0.08);
+  --el-fill-color-blank: var(--app-surface);
+  --el-color-primary: var(--app-brand);
+  --el-color-primary-light-3: #6BA6FF;
+  --el-color-primary-light-5: rgba(62, 139, 255, 0.45);
+  --el-color-primary-light-7: rgba(62, 139, 255, 0.30);
+  --el-color-primary-light-8: rgba(62, 139, 255, 0.20);
+  --el-color-primary-light-9: rgba(62, 139, 255, 0.12);
+  --el-color-primary-dark-2: #1B5FB8;
 
   --el-font-size-base: 14px;
 
@@ -30,6 +63,57 @@
   --sp-4: 16px;
   --sp-5: 20px;
   --sp-6: 24px;
+}
+
+html.light {
+  color-scheme: light;
+
+  /* 应用语义 token（浅色） */
+  --app-bg: #F3F5F9;
+  --app-bg-glow: none;
+  --app-surface: #FFFFFF;
+  --app-surface-2: #F8FAFD;
+  --app-border: #E3E8F0;
+  --app-border-strong: #C9D4E4;
+  --app-text-1: #16233C;
+  --app-text-2: #57677F;
+  --app-text-3: #8C99AE;
+  --app-placeholder: #A9B4C6;
+  --app-brand: #1667C8;
+  --app-brand-2: #4A8AD8;
+  --app-brand-grad: linear-gradient(135deg, #1667C8, #4A8AD8);
+  --app-shadow: 0 1px 2px rgba(22, 35, 60, 0.04);
+  --app-scrollbar: #C7D0DE;
+  --app-scrollbar-hover: #A9B4C6;
+  --app-glass-card: #FFFFFF;
+  --app-menu-hover-bg: #EEF3FA;
+  --app-menu-active-bg: #E8F1FC;
+  --app-table-hover: #F6F9FD;
+  --app-danger: #E64340;
+
+  /* Element Plus 变量映射（浅色，沿用原企业级配色） */
+  --el-bg-color: #FFFFFF;
+  --el-bg-color-overlay: #FFFFFF;
+  --el-bg-color-page: #F3F5F9;
+  --el-border-color: #E3E8F0;
+  --el-border-color-light: #E3E8F0;
+  --el-border-color-lighter: #EBF0F7;
+  --el-border-color-extra-light: #F1F4F9;
+  --el-text-color-primary: #16233C;
+  --el-text-color-regular: #57677F;
+  --el-text-color-secondary: #8C99AE;
+  --el-text-color-placeholder: #A9B4C6;
+  --el-fill-color: #F3F5F9;
+  --el-fill-color-light: #F3F5F9;
+  --el-fill-color-lighter: #F8FAFD;
+  --el-fill-color-blank: #FFFFFF;
+  --el-color-primary: #1667C8;
+  --el-color-primary-light-3: #4A8AD8;
+  --el-color-primary-light-5: #7FABE2;
+  --el-color-primary-light-7: #B3CDEC;
+  --el-color-primary-light-8: #CFE0F4;
+  --el-color-primary-light-9: #E9F1FB;
+  --el-color-primary-dark-2: #0F51A8;
 }
 
 * {
@@ -46,8 +130,10 @@ body {
 body {
   font-family: 'HarmonyOS Sans SC', 'MiSans', 'Microsoft YaHei UI', -apple-system, 'Segoe UI', Arial, sans-serif;
   font-size: 14px;
-  color: #16233C;
-  background-color: #F3F5F9;
+  color: var(--app-text-1);
+  background-color: var(--app-bg);
+  background-image: var(--app-bg-glow);
+  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -62,10 +148,16 @@ body {
 
 /* 内容卡片 */
 .page-card {
-  background: #FFFFFF;
-  border: 1px solid #E3E8F0;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
   border-radius: 10px;
-  box-shadow: 0 1px 2px rgba(22, 35, 60, 0.04);
+  box-shadow: var(--app-shadow);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.page-card:hover {
+  border-color: var(--app-border-strong);
+  transform: translateY(-1px);
 }
 
 /* 页面通用布局：四段式（页头/筛选/表格/分页），段间 16-20px */
@@ -88,14 +180,14 @@ body {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
-  color: #16233C;
+  color: var(--app-text-1);
   line-height: 1.4;
 }
 
 .page-header .ph-desc {
   margin: var(--sp-1) 0 0;
   font-size: 12.5px;
-  color: #57677F;
+  color: var(--app-text-2);
   line-height: 1.5;
 }
 
@@ -107,17 +199,17 @@ body {
   padding-top: 2px;
 }
 
-/* 筛选卡片：独立白卡承载查询条件（段间距由 page-view gap 提供） */
+/* 筛选卡片：独立卡片承载查询条件（段间距由 page-view gap 提供） */
 .filter-card {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--sp-3);
   padding: var(--sp-4) var(--sp-5);
-  background: #FFFFFF;
-  border: 1px solid #E3E8F0;
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
   border-radius: 10px;
-  box-shadow: 0 1px 2px rgba(22, 35, 60, 0.04);
+  box-shadow: var(--app-shadow);
 }
 
 .filter-card .f-spacer {
@@ -127,21 +219,21 @@ body {
 .page-title {
   font-size: 16px;
   font-weight: 600;
-  color: #16233C;
+  color: var(--app-text-1);
 }
 
 .page-desc {
   font-size: 13px;
-  color: #8C99AE;
+  color: var(--app-text-3);
   margin-top: 2px;
 }
 
 /* 表格微调 */
 .el-table {
-  --el-table-header-bg-color: #F8FAFD;
-  --el-table-header-text-color: #57677F;
-  --el-table-border-color: #EBF0F7;
-  --el-table-row-hover-bg-color: #F6F9FD;
+  --el-table-header-bg-color: var(--app-surface-2);
+  --el-table-header-text-color: var(--app-text-2);
+  --el-table-border-color: var(--el-border-color-lighter);
+  --el-table-row-hover-bg-color: var(--app-table-hover);
   font-size: 13.5px;
 }
 
@@ -149,6 +241,7 @@ body {
   padding: 10px 0;
   font-weight: 600;
   font-size: 12.5px;
+  letter-spacing: 0.02em;
 }
 
 .el-table td.el-table__cell {
@@ -194,12 +287,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #C7D0DE;
+  background: var(--app-scrollbar);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #A9B4C6;
+  background: var(--app-scrollbar-hover);
 }
 
 ::-webkit-scrollbar-track {
