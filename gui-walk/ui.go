@@ -35,10 +35,13 @@ type uiState struct {
 
 	// 工作页
 	workPage    *walk.Composite
-	lblStatus   *walk.Label
+	banner      *walk.Composite // 品牌横幅（背景色在窗口创建后设置）
+	bannerBrush *walk.SolidColorBrush // 横幅背景画刷（须持有引用防 GC 回收）
+	lblDot      *walk.Label // 状态红绿灯（品牌横幅内）
+	lblStatus   *walk.Label // 横幅内白色状态文字
 	btnLogout   *walk.PushButton
-	grpRules    *walk.Composite // 客户端：映射区
-	grpHosts    *walk.Composite // 服务端：白名单区
+	grpRules    *walk.GroupBox // 客户端：映射区
+	grpHosts    *walk.GroupBox // 服务端：白名单区
 	table       *walk.TableView
 	lbHosts     *walk.ListBox
 	edRuleHost  *walk.LineEdit
@@ -158,13 +161,38 @@ func runUI(a *App) error {
 		Visible:  !bootAutostart, // 开机自启拉起：窗口不显示，仅托盘
 		Layout:   VBox{Margins: Margins{Left: 14, Top: 12, Right: 14, Bottom: 12}, Spacing: 10},
 		Children: []Widget{
-			// ---------- 登录页：上下 VSpacer 夹持表单，任何窗口高度下表单垂直居中 ----------
+			// ---------- 登录页：品牌区 + 表单，整体垂直居中 ----------
 			Composite{
 				AssignTo:      &ui.loginPage,
 				StretchFactor: 1,
-				Layout:        VBox{Margins: Margins{Left: 24, Top: 8, Right: 24, Bottom: 8}, Spacing: 12},
+				Layout:        VBox{Margins: Margins{Left: 24, Top: 8, Right: 24, Bottom: 8}, Spacing: 14},
 				Children: []Widget{
 					VSpacer{StretchFactor: 2},
+					// 品牌区：图标 + 产品名 + 副标题（HSpacer 夹持水平居中）
+					Composite{
+						Layout: HBox{Margins: Margins{}},
+						Children: []Widget{
+							HSpacer{},
+							ImageView{Image: appIcon, MinSize: Size{Width: 64, Height: 64}},
+							HSpacer{},
+						},
+					},
+					Composite{
+						Layout: HBox{Margins: Margins{}},
+						Children: []Widget{
+							HSpacer{},
+							Label{Text: "励联 LiLink", Font: Font{PointSize: 16, Bold: true}},
+							HSpacer{},
+						},
+					},
+					Composite{
+						Layout: HBox{Margins: Margins{}},
+						Children: []Widget{
+							HSpacer{},
+							Label{Text: "内网互联 · 端口映射", TextColor: walk.RGB(110, 110, 110)},
+							HSpacer{},
+						},
+					},
 					Composite{
 						Layout: Grid{Columns: 2, Spacing: 12, Margins: Margins{}},
 						Children: append(append([]Widget{}, formChildren[:len(formChildren)-2]...),
@@ -173,28 +201,32 @@ func runUI(a *App) error {
 					VSpacer{StretchFactor: 3},
 				},
 			},
-			// ---------- 工作页：弹性空间只分给映射区(5)和日志区(3)，其余行保持固有高度 ----------
+			// ---------- 工作页：品牌横幅 + 分组面板；弹性空间只给映射区(5)和日志区(3) ----------
 			Composite{
 				AssignTo:      &ui.workPage,
 				Visible:       false,
 				StretchFactor: 1,
 				Layout:        VBox{Margins: Margins{}, Spacing: 8},
 				Children: []Widget{
-					// 状态行：状态文字 + 右侧注销按钮
-					Composite{
-						Layout: HBox{Margins: Margins{}, Spacing: 8},
+				// 品牌横幅：深蓝底、白字状态 + 红绿灯、右侧注销（背景色在窗口创建后设置）
+				Composite{
+					AssignTo: &ui.banner,
+					MinSize:  Size{Height: 46},
+					Layout:   HBox{Margins: Margins{Left: 12, Top: 8, Right: 8, Bottom: 8}, Spacing: 8},
 						Children: []Widget{
-							Label{AssignTo: &ui.lblStatus, Text: "状态：未连接", StretchFactor: 1,
-								TextColor: walk.RGB(31, 78, 121)},
-							PushButton{AssignTo: &ui.btnLogout, Text: "注销", MinSize: Size{Width: 88},
+							Label{AssignTo: &ui.lblDot, Text: "●", TextColor: walk.RGB(235, 90, 90)},
+							Label{AssignTo: &ui.lblStatus, Text: "状态：未连接",
+								TextColor: walk.RGB(255, 255, 255), StretchFactor: 1},
+							PushButton{AssignTo: &ui.btnLogout, Text: "注销", MinSize: Size{Width: 80},
 								OnClicked: func() { ui.onLogout() }},
 						},
 					},
 					// 客户端：端口映射
-					Composite{
+					GroupBox{
 						AssignTo:      &ui.grpRules,
-						Layout:        VBox{Margins: Margins{}, Spacing: 6},
+						Title:         "端口映射",
 						StretchFactor: 5,
+						Layout:        VBox{Margins: Margins{Left: 10, Top: 8, Right: 10, Bottom: 10}, Spacing: 6},
 						Children: []Widget{
 							// 末列吃掉表格剩余宽度；表格纵向吃掉映射区多余高度
 							TableView{
@@ -231,11 +263,12 @@ func runUI(a *App) error {
 						},
 					},
 					// 服务端：白名单
-					Composite{
+					GroupBox{
 						AssignTo:      &ui.grpHosts,
+						Title:         "访问白名单",
 						Visible:       false,
-						Layout:        VBox{Margins: Margins{}, Spacing: 6},
 						StretchFactor: 5,
+						Layout:        VBox{Margins: Margins{Left: 10, Top: 8, Right: 10, Bottom: 10}, Spacing: 6},
 						Children: []Widget{
 							ListBox{AssignTo: &ui.lbHosts, Model: ui.hm},
 							Composite{
@@ -275,12 +308,17 @@ func runUI(a *App) error {
 							HSpacer{},
 						},
 					},
-					TextEdit{
-						AssignTo:      &ui.tvLog,
-						ReadOnly:      true,
-						VScroll:       true,
+					GroupBox{
+						Title:         "运行日志",
 						StretchFactor: 3,
-						MinSize:       Size{Height: 120},
+						Layout:        VBox{Margins: Margins{Left: 10, Top: 8, Right: 10, Bottom: 10}},
+						Children: []Widget{
+							TextEdit{
+								AssignTo: &ui.tvLog,
+								ReadOnly: true,
+								VScroll:  true,
+							},
+						},
 					},
 				},
 			},
@@ -290,6 +328,9 @@ func runUI(a *App) error {
 	if err := mainWindow.Create(); err != nil {
 		return fmt.Errorf("创建主窗口失败：%w", err)
 	}
+	// 品牌横幅深蓝底（declarative 无 BackgroundColor 字段，创建后设置）
+	ui.bannerBrush, _ = walk.NewSolidColorBrush(walk.RGB(31, 78, 121))
+	ui.banner.SetBackground(ui.bannerBrush)
 	if saved.Role == "server" {
 		ui.rbServer.SetChecked(true)
 	} else {
@@ -382,6 +423,11 @@ func (ui *uiState) syncState(running bool) {
 	state := "未连接"
 	if running {
 		state = "连接中"
+	}
+	if running {
+		ui.lblDot.SetTextColor(walk.RGB(120, 220, 130)) // 绿灯
+	} else {
+		ui.lblDot.SetTextColor(walk.RGB(235, 90, 90)) // 红灯
 	}
 	ui.lblStatus.SetText(fmt.Sprintf("状态：%s　账号：%s　设备：%s（%s）", state, s.User.Username, s.DeviceName, role))
 	if running {
