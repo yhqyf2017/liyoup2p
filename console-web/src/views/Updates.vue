@@ -3,20 +3,20 @@
     <div class="page-header">
       <div>
         <h2 class="ph-title">版本发布</h2>
-        <p class="ph-desc">PC / 安卓双通道安装包发布与版本管理</p>
+        <p class="ph-desc">PC / 安卓 / Win7 三通道安装包发布与版本管理</p>
       </div>
       <div class="ph-actions">
         <el-button :icon="Refresh" circle text @click="loadAll" />
       </div>
     </div>
 
-    <!-- 双通道当前版本 -->
+    <!-- 三通道当前版本 -->
     <div class="channel-grid">
-      <div v-for="ch in ['pc', 'android']" :key="ch" class="page-card channel-card">
+      <div v-for="ch in ['pc', 'android', 'win7']" :key="ch" class="page-card channel-card">
         <div class="ch-head">
           <div class="ch-name">
-            <el-icon :size="18" class="ch-icon"><Monitor v-if="ch === 'pc'" /><Iphone v-else /></el-icon>
-            <span>{{ ch === 'pc' ? 'PC 客户端' : '安卓客户端' }}</span>
+            <el-icon :size="18" class="ch-icon"><Monitor v-if="ch === 'pc'" /><Iphone v-else-if="ch === 'android'" /><Cpu v-else /></el-icon>
+            <span>{{ channelName(ch) }}</span>
           </div>
           <el-tag v-if="channels[ch] && channels[ch].version" type="success" size="small" effect="light">已发布</el-tag>
           <el-tag v-else type="info" size="small" effect="light">未发布</el-tag>
@@ -41,6 +41,7 @@
             <el-radio-group v-model="form.channel">
               <el-radio-button value="pc">PC 客户端</el-radio-button>
               <el-radio-button value="android">安卓客户端</el-radio-button>
+              <el-radio-button value="win7">Win7 客户端</el-radio-button>
             </el-radio-group>
           </el-form-item>
           <el-form-item label="版本号" required>
@@ -83,7 +84,7 @@
 
       <el-alert v-if="result" :type="result.ok ? 'success' : 'error'" :closable="false" class="uc-result">
         <template #title>
-          {{ result.ok ? `发布成功：${result.version} 已上线${result.channel === 'pc' ? ' PC' : ' 安卓'}通道` : '发布失败' }}
+          {{ result.ok ? `发布成功：${result.version} 已上线${channelName(result.channel)}通道` : '发布失败' }}
         </template>
         <div v-if="result.ok" class="uc-result-body">
           <div>新包 SHA256：<span class="mono">{{ result.sha256 }}</span></div>
@@ -98,22 +99,27 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Monitor, Iphone, Refresh, UploadFilled } from '@element-plus/icons-vue'
+import { Monitor, Iphone, Cpu, Refresh, UploadFilled } from '@element-plus/icons-vue'
 import http from '../api'
 
-const channels = reactive({ pc: null, android: null })
+const CHANNEL_NAMES = { pc: 'PC 客户端', android: '安卓客户端', win7: 'Win7 客户端' }
+const channels = reactive({ pc: null, android: null, win7: null })
 const form = reactive({ channel: 'pc', version: '', notes: '' })
 const file = ref(null)
 const uploading = ref(false)
 const progress = ref(0)
 const result = ref(null)
 
-const ACCEPT = { pc: ['.exe', '.zip'], android: ['.apk', '.zip'] }
+const ACCEPT = { pc: ['.exe', '.zip'], android: ['.apk', '.zip'], win7: ['.exe', '.zip'] }
 const MAX_SIZE = 200 * 1024 * 1024
 
 const canSubmit = computed(
   () => !!(form.channel && form.version && file.value) && !uploading.value
 )
+
+function channelName(ch) {
+  return CHANNEL_NAMES[ch] || ch
+}
 
 function shortSha(s) {
   return s ? String(s).slice(0, 12) : '—'
@@ -135,7 +141,7 @@ function onFileChange(upFile) {
   const ext = name.slice(name.lastIndexOf('.')).toLowerCase()
   const allowed = ACCEPT[form.channel] || []
   if (!allowed.includes(ext)) {
-    ElMessage.error(`渠道不匹配：${form.channel === 'pc' ? 'PC 通道' : '安卓通道'}仅支持 ${allowed.join(' / ')}`)
+    ElMessage.error(`渠道不匹配：${channelName(form.channel)}仅支持 ${allowed.join(' / ')}`)
     file.value = null
     upFile.raw = null
     return
@@ -156,6 +162,9 @@ function loadAll() {
   http.get('/api/update/latest?ch=android', { silent: true })
     .then((d) => { channels.android = d && d.version ? d : null })
     .catch(() => { channels.android = null })
+  http.get('/api/update/latest?ch=win7', { silent: true })
+    .then((d) => { channels.win7 = d && d.version ? d : null })
+    .catch(() => { channels.win7 = null })
 }
 
 function submit() {
@@ -212,9 +221,15 @@ onMounted(loadAll)
 <style scoped>
 .channel-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   margin-bottom: 16px;
+}
+
+@media (max-width: 1200px) {
+  .channel-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .channel-card {

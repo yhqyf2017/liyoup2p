@@ -376,6 +376,10 @@ func runUI(a *App) error {
 		return fmt.Errorf("托盘初始化失败：%w", err)
 	}
 
+	// 自动更新（win7 通道）：注册更新安装后的退出回调并启动后台检查循环
+	a.onExitRequest = func() { ui.mw.Synchronize(ui.exitApp) }
+	go a.updateLoop()
+
 	// 历史日志回填（环形缓冲里已有启动前的日志）
 	if logs := a.GetLogs(); len(logs) > 0 {
 		ui.appendLogs(logs)

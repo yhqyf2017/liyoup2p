@@ -40,6 +40,14 @@ func setupTray(ui *uiState) error {
 
 	_ = ni.ContextMenu().Actions().Add(walk.NewSeparatorAction())
 
+	// 检查更新：手动触发 win7 通道版本检查（有新版则下载静默安装）
+	actUpdate := walk.NewAction()
+	actUpdate.SetText("检查更新")
+	actUpdate.Triggered().Attach(func() { go ui.CheckUpdateManual() })
+	_ = ni.ContextMenu().Actions().Add(actUpdate)
+
+	_ = ni.ContextMenu().Actions().Add(walk.NewSeparatorAction())
+
 	// 退出：停 Agent + 保存会话 + 真退出（对齐主 GUI beforeClose 语义）
 	actExit := walk.NewAction()
 	actExit.SetText("退出")

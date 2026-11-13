@@ -56,7 +56,8 @@ if ($occupied) {
 }
 
 # ---------- 3. 构建（缺失或源码较新时） ----------
-$exe = Join-Path $PSScriptRoot 'liyou-platform.exe'
+# 运行 exe 在工作目录根（dev：仓库根；部署包：脚本目录）
+$exe = Join-Path $root 'liyou-platform.exe'
 $srcMain = Join-Path $PSScriptRoot 'cmd\platform\main.go'
 $needBuild = (-not (Test-Path $exe))
 if (-not $needBuild -and (Test-Path $srcMain)) {
@@ -80,6 +81,9 @@ if ($needBuild) {
     if (-not $ok) { Write-Error '平台构建失败，请检查 go 环境与源码'; exit 1 }
     # 开发环境：构建产物在 platform-go\，同步到工作目录根供运行
     if ($root -ne $PSScriptRoot) {
+        # dev 模式：构建产物在 platform-go\，运行 exe 在仓库根
+        Copy-Item (Join-Path $PSScriptRoot 'liyou-platform.exe') $exe -Force
+    } elseif ((Join-Path $PSScriptRoot 'liyou-platform.exe') -ne $exe) {
         Copy-Item (Join-Path $PSScriptRoot 'liyou-platform.exe') $exe -Force
     }
     Write-Host '构建完成。'

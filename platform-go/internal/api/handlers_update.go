@@ -1,6 +1,7 @@
 // 升级分发：多通道版本查询（免鉴权）+ 安装包发布/列表（superadmin）。
-// version.json 多通道格式：{"pc":{version,url,sha256,notes,releasedAt},"android":{...}}；
+// version.json 多通道格式：{"pc":{...},"android":{...},"win7":{...}}；
 // 兼容旧单通道扁平格式（读到 pc 通道）；安装包本体由 /update/ 静态托管。
+// win7 通道面向 Win7 老系统客户端（gui-walk），安装包为 Inno Setup 双架构安装器。
 package api
 
 import (
@@ -29,6 +30,7 @@ type updateInfo struct {
 type channels struct {
 	PC      *updateInfo `json:"pc"`
 	Android *updateInfo `json:"android"`
+	Win7    *updateInfo `json:"win7"`
 }
 
 // UpdateAPI 升级 API：Dir 为平台 update 目录（version.json 与安装包）。
@@ -67,17 +69,19 @@ func (u *UpdateAPI) saveChannels(ch channels) error {
 }
 
 // Latest GET /api/update/latest（免鉴权）：默认/pc 返回 pc 通道扁平字段（兼容旧客户端），
-// ch=android 返回 android 通道；通道缺失或文件不存在时 version 为空串。
+// ch=android / ch=win7 返回对应通道；通道缺失或文件不存在时 version 为空串。
 func (u *UpdateAPI) Latest(w http.ResponseWriter, r *http.Request) {
 	ch := u.readChannels()
 	var sel *updateInfo
 	switch r.URL.Query().Get("ch") {
 	case "android":
 		sel = ch.Android
+	case "win7":
+		sel = ch.Win7
 	case "", "pc":
 		sel = ch.PC
 	default:
-		Fail(w, http.StatusBadRequest, 1002, "未知更新通道，仅支持 pc / android")
+		Fail(w, http.StatusBadRequest, 1002, "未知更新通道，仅支持 pc / android / win7")
 		return
 	}
 	if sel == nil {
@@ -97,7 +101,11 @@ func (u *UpdateAPI) List(w http.ResponseWriter, r *http.Request) {
 	if an == nil {
 		an = &updateInfo{}
 	}
-	OK(w, channels{PC: pc, Android: an})
+	w7 := ch.Win7
+	if w7 == nil {
+		w7 = &updateInfo{}
+	}
+	OK(w, channels{PC: pc, Android: an, Win7: w7})
 }
 
 // Publish POST /api/platform/updates（superadmin，multipart：channel+version+notes+file）：
@@ -112,8 +120,8 @@ func (u *UpdateAPI) Publish(w http.ResponseWriter, r *http.Request) {
 	channel := strings.TrimSpace(r.FormValue("channel"))
 	version := strings.TrimSpace(r.FormValue("version"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
-	if channel != "pc" && channel != "android" {
-		Fail(w, http.StatusBadRequest, 1002, "channel 仅支持 pc / android")
+	if channel != "pc" && channel != "android" && channel != "win7" {
+		Fail(w, http.StatusBadRequest, 1002, "channel 仅支持 pc / android / win7")
 		return
 	}
 	if version == "" || strings.ContainsAny(version, `\/:*?"<>| `) || strings.Contains(version, "..") {
@@ -167,10 +175,13 @@ func (u *UpdateAPI) Publish(w http.ResponseWriter, r *http.Request) {
 		ReleasedAt: time.Now().Format(time.RFC3339),
 	}
 	ch := u.readChannels()
-	if channel == "pc" {
+	switch channel {
+	case "pc":
 		ch.PC = &info
-	} else {
+	case "android":
 		ch.Android = &info
+	case "win7":
+		ch.Win7 = &info
 	}
 	if err := u.saveChannels(ch); err != nil {
 		Fail(w, http.StatusInternalServerError, 5000, "更新 version.json 失败: "+err.Error())

@@ -157,7 +157,9 @@ type App struct {
 	cmd      *exec.Cmd
 	running  bool
 	stopping bool
-	exiting  bool   // 托盘「退出」置位：允许 Closing 事件真正关闭进程
+	exiting  bool     // 托盘「退出」置位：允许 Closing 事件真正关闭进程
+	updating bool     // 自动更新下载安装中（防自动/手动检查并发重复安装）
+	onExitRequest func() // 更新安装后退出回调（runUI 注册，投递主线程 exitApp）
 	adminAddr  string // Agent 管理通道实际地址（解析自 Agent 日志，如 127.0.0.1:53210）
 	adminToken string // Agent 管理通道鉴权令牌
 
