@@ -15,11 +15,21 @@
     <div class="filter-card">
       <el-input
         v-model="keyword"
-        placeholder="搜索用户名 / 所属租户"
+        placeholder="搜索用户名"
         clearable
         :prefix-icon="Search"
-        style="width: 220px"
+        style="width: 200px"
       />
+      <el-select
+        v-if="isSuper()"
+        v-model="tenantFilter"
+        clearable
+        placeholder="全部租户"
+        style="width: 200px"
+      >
+        <el-option label="平台账号" :value="-1" />
+        <el-option v-for="t in tenants" :key="t.id" :label="`${t.name}（${t.code}）`" :value="t.id" />
+      </el-select>
       <div class="f-spacer"></div>
       <el-button :icon="Refresh" circle text @click="load" />
     </div>
@@ -144,6 +154,7 @@ import { fmtTime } from '../utils'
 const list = ref([])
 const loading = ref(false)
 const keyword = ref('')
+const tenantFilter = ref(0) // 0=全部，-1=平台账号，>0=租户 ID
 const tenants = ref([])
 
 const currentUserId = computed(() => (store.user ? store.user.id : 0))
@@ -152,11 +163,19 @@ const isSelfById = () => currentRow.value && currentRow.value.ID === currentUser
 
 // 按租户聚合展示：同租户成员相邻，租户名为空（平台账号）排最后
 const filteredList = computed(() => {
+  let arr = list.value
+  const tf = tenantFilter.value || 0
+  if (isSuper() && tf !== 0) {
+    arr = arr.filter((u) => {
+      const id = u.TenantID && u.TenantID.Valid ? u.TenantID.Int64 : 0
+      return tf === -1 ? id === 0 : id === tf
+    })
+  }
   const kw = keyword.value.trim().toLowerCase()
-  const arr = kw
-    ? list.value.filter((u) => `${u.Username} ${u.TenantName || ''}`.toLowerCase().includes(kw))
-    : list.value.slice()
-  return arr.sort((a, b) => {
+  if (kw) {
+    arr = arr.filter((u) => `${u.Username} ${u.TenantName || ''}`.toLowerCase().includes(kw))
+  }
+  return arr.slice().sort((a, b) => {
     const an = a.TenantName || ''
     const bn = b.TenantName || ''
     if (!an && bn) return 1
@@ -320,7 +339,10 @@ function askDelete(row) {
     .catch(() => {})
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  ensureTenants()
+})
 </script>
 
 <style scoped>
