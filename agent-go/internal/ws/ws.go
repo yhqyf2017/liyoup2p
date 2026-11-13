@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -31,8 +32,14 @@ type Client struct {
 	conn *websocket.Conn
 }
 
-// New 创建客户端。
+// New 创建客户端（URL 追加 os 参数：平台据此在设备管理中显示操作系统）。
 func New(addr, token string) *Client {
+	if u, err := url.Parse(addr); err == nil && osInfo != "" {
+		q := u.Query()
+		q.Set("os", osInfo)
+		u.RawQuery = q.Encode()
+		addr = u.String()
+	}
 	return &Client{URL: addr, Token: token}
 }
 

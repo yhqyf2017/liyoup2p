@@ -32,25 +32,26 @@ func (a *MiscAPI) Audit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type auditItem struct {
-		ID        int64  `json:"id"`
-		TenantID  int64  `json:"tenant_id"`
-		Actor     string `json:"actor"`
-		Action    string `json:"action"`
-		Detail    string `json:"detail"`
-		ClientIP  string `json:"client_ip"`
-		CreatedAt string `json:"created_at"`
+		ID         int64  `json:"id"`
+		TenantID   int64  `json:"tenant_id"`
+		TenantName string `json:"tenant_name"`
+		Actor      string `json:"actor"`
+		Action     string `json:"action"`
+		Detail     string `json:"detail"`
+		ClientIP   string `json:"client_ip"`
+		CreatedAt  string `json:"created_at"`
 	}
 	list := make([]auditItem, 0, len(items))
 	for _, it := range items {
 		list = append(list, auditItem{
-			ID: it.ID, TenantID: it.TenantID.Int64, Actor: it.Actor, Action: it.Action,
+			ID: it.ID, TenantID: it.TenantID.Int64, TenantName: it.TenantName, Actor: it.Actor, Action: it.Action,
 			Detail: it.Detail, ClientIP: it.ClientIP.String, CreatedAt: it.CreatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
 	OK(w, map[string]any{"items": list, "total": total, "page": page, "page_size": size})
 }
 
-// Sessions 隧道会话列表。
+// Sessions 隧道会话列表（含租户名/两端设备名/归属账号）。
 func (a *MiscAPI) Sessions(w http.ResponseWriter, r *http.Request) {
 	u := CurrentUser(r)
 	sessions, err := a.St.ListSessions(r.Context(), tenantScope(r, u), r.URL.Query().Get("status"))
@@ -65,8 +66,10 @@ func (a *MiscAPI) Sessions(w http.ResponseWriter, r *http.Request) {
 			ended = s.EndedAt.Time.Format("2006-01-02 15:04:05")
 		}
 		items = append(items, map[string]any{
-			"session_id": s.SessionID, "tenant_id": s.TenantID,
+			"session_id": s.SessionID, "tenant_id": s.TenantID, "tenant_name": s.TenantName,
 			"client_device_uid": s.ClientUID, "server_device_uid": s.ServerUID,
+			"client_name": s.ClientName, "server_name": s.ServerName,
+			"client_owner": s.ClientOwner, "server_owner": s.ServerOwner,
 			"port": s.Port, "mode": s.Mode, "status": s.Status,
 			"relay_bytes": s.RelayBytes, "started_at": s.StartedAt.Format("2006-01-02 15:04:05"),
 			"ended_at": ended,
@@ -87,7 +90,7 @@ func (a *MiscAPI) Alerts(w http.ResponseWriter, r *http.Request) {
 	items := make([]map[string]any, 0, len(alerts))
 	for _, al := range alerts {
 		items = append(items, map[string]any{
-			"id": al.ID, "tenant_id": al.TenantID.Int64, "level": al.Level,
+			"id": al.ID, "tenant_id": al.TenantID.Int64, "tenant_name": al.TenantName, "level": al.Level,
 			"title": al.Title, "detail": al.Detail, "is_read": al.IsRead,
 			"created_at": al.CreatedAt.Format("2006-01-02 15:04:05"),
 		})

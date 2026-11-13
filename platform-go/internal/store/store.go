@@ -77,6 +77,8 @@ var schema = []string{
 		last_online_at TIMESTAMPTZ,
 		created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 	)`,
+	// 旧库兼容：为已存在的 devices 表补归属账号列（幂等）
+	`ALTER TABLE devices ADD COLUMN IF NOT EXISTS owner TEXT NOT NULL DEFAULT ''`,
 	`CREATE TABLE IF NOT EXISTS device_ports (
 		id BIGSERIAL PRIMARY KEY,
 		device_id BIGINT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
@@ -417,21 +419,21 @@ func (s *Store) DeleteTenant(ctx context.Context, id int64) error {
 
 // FindDeviceByUID 按设备 UID 查询。
 func (s *Store) FindDeviceByUID(ctx context.Context, uid string) (*Device, error) {
-	row := s.DB.QueryRowContext(ctx, `SELECT id, tenant_id, device_uid, name, role, token_hash, status, os_info, last_online_at, created_at
+	row := s.DB.QueryRowContext(ctx, `SELECT id, tenant_id, device_uid, name, role, token_hash, status, owner, os_info, last_online_at, created_at
 		FROM devices WHERE device_uid=$1`, uid)
 	return scanDevice(row)
 }
 
 // FindDeviceByID 按 ID 查询设备。
 func (s *Store) FindDeviceByID(ctx context.Context, id int64) (*Device, error) {
-	row := s.DB.QueryRowContext(ctx, `SELECT id, tenant_id, device_uid, name, role, token_hash, status, os_info, last_online_at, created_at
+	row := s.DB.QueryRowContext(ctx, `SELECT id, tenant_id, device_uid, name, role, token_hash, status, owner, os_info, last_online_at, created_at
 		FROM devices WHERE id=$1`, id)
 	return scanDevice(row)
 }
 
 func scanDevice(row *sql.Row) (*Device, error) {
 	var d Device
-	if err := row.Scan(&d.ID, &d.TenantID, &d.DeviceUID, &d.Name, &d.Role, &d.TokenHash, &d.Status, &d.OSInfo, &d.LastOnlineAt, &d.CreatedAt); err != nil {
+	if err := row.Scan(&d.ID, &d.TenantID, &d.DeviceUID, &d.Name, &d.Role, &d.TokenHash, &d.Status, &d.Owner, &d.OSInfo, &d.LastOnlineAt, &d.CreatedAt); err != nil {
 		if noRows(err) {
 			return nil, nil
 		}
@@ -442,7 +444,7 @@ func scanDevice(row *sql.Row) (*Device, error) {
 
 // ListDevices 设备列表（含端口数），tenantID<=0 表示全部。
 func (s *Store) ListDevices(ctx context.Context, tenantID int64, role, status string) ([]DeviceView, error) {
-	q := `SELECT d.id, d.tenant_id, d.device_uid, d.name, d.role, d.status, d.os_info, d.last_online_at, d.created_at,
+	q := `SELECT d.id, d.tenant_id, d.device_uid, d.name, d.role, d.status, d.owner, d.os_info, d.last_online_at, d.created_at,
 		(SELECT count(*) FROM device_ports p WHERE p.device_id=d.id AND p.declared), COALESCE(t.name,'')
 		FROM devices d LEFT JOIN tenants t ON t.id=d.tenant_id WHERE ($1::bigint IS NULL OR d.tenant_id=$1)`
 	args := []any{tenantArg(tenantID)}
@@ -463,7 +465,7 @@ func (s *Store) ListDevices(ctx context.Context, tenantID int64, role, status st
 	var out []DeviceView
 	for rows.Next() {
 		var v DeviceView
-		if err := rows.Scan(&v.ID, &v.TenantID, &v.DeviceUID, &v.Name, &v.Role, &v.Status, &v.OSInfo,
+		if err := rows.Scan(&v.ID, &v.TenantID, &v.DeviceUID, &v.Name, &v.Role, &v.Status, &v.Owner, &v.OSInfo,
 			&v.LastOnlineAt, &v.CreatedAt, &v.PortCount, &v.TenantName); err != nil {
 			return nil, err
 		}
@@ -472,12 +474,24 @@ func (s *Store) ListDevices(ctx context.Context, tenantID int64, role, status st
 	return out, rows.Err()
 }
 
-// CreateDevice 新建设备。
-func (s *Store) CreateDevice(ctx context.Context, tenantID int64, uid, name, role, tokenHash string) (int64, error) {
+// CreateDevice 新建设备（owner 为归属账号）。
+func (s *Store) CreateDevice(ctx context.Context, tenantID int64, uid, name, role, tokenHash, owner string) (int64, error) {
 	var id int64
-	err := s.DB.QueryRowContext(ctx, `INSERT INTO devices (tenant_id, device_uid, name, role, token_hash)
-		VALUES ($1,$2,$3,$4,$5) RETURNING id`, tenantID, uid, name, role, tokenHash).Scan(&id)
+	err := s.DB.QueryRowContext(ctx, `INSERT INTO devices (tenant_id, device_uid, name, role, token_hash, owner)
+		VALUES ($1,$2,$3,$4,$5,$6) RETURNING id`, tenantID, uid, name, role, tokenHash, owner).Scan(&id)
 	return id, err
+}
+
+// SetDeviceOSInfo 更新设备操作系统信息（agent 连接时上报）。
+func (s *Store) SetDeviceOSInfo(ctx context.Context, id int64, osInfo string) error {
+	_, err := s.DB.ExecContext(ctx, `UPDATE devices SET os_info=$2 WHERE id=$1`, id, osInfo)
+	return err
+}
+
+// SetDeviceOwner 更新设备归属账号（同 UID 被其他账号重新注册时跟随最新账号）。
+func (s *Store) SetDeviceOwner(ctx context.Context, id int64, owner string) error {
+	_, err := s.DB.ExecContext(ctx, `UPDATE devices SET owner=$2 WHERE id=$1`, id, owner)
+	return err
 }
 
 // SetDeviceToken 更新设备令牌哈希。
@@ -507,7 +521,7 @@ func (s *Store) SetDeviceOffline(ctx context.Context, id int64) error {
 // OnlineServers 租户内在线的服务端设备（最近活跃优先：客户端未指定目标时，
 // 自动路由应选中用户正在 GUI 管理的那台实例，而非最早注册的历史设备记录）。
 func (s *Store) OnlineServers(ctx context.Context, tenantID int64) ([]Device, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id, tenant_id, device_uid, name, role, token_hash, status, os_info, last_online_at, created_at
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, tenant_id, device_uid, name, role, token_hash, status, owner, os_info, last_online_at, created_at
 		FROM devices WHERE tenant_id=$1 AND role='server' AND status='online' ORDER BY last_online_at DESC NULLS LAST, id DESC LIMIT 50`, tenantID)
 	if err != nil {
 		return nil, err
@@ -516,7 +530,7 @@ func (s *Store) OnlineServers(ctx context.Context, tenantID int64) ([]Device, er
 	var out []Device
 	for rows.Next() {
 		var d Device
-		if err := rows.Scan(&d.ID, &d.TenantID, &d.DeviceUID, &d.Name, &d.Role, &d.TokenHash, &d.Status, &d.OSInfo, &d.LastOnlineAt, &d.CreatedAt); err != nil {
+		if err := rows.Scan(&d.ID, &d.TenantID, &d.DeviceUID, &d.Name, &d.Role, &d.TokenHash, &d.Status, &d.Owner, &d.OSInfo, &d.LastOnlineAt, &d.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, d)
@@ -554,10 +568,10 @@ func (s *Store) ReplaceDevicePorts(ctx context.Context, deviceID int64, ports []
 	return tx.Commit()
 }
 
-// ListPortViews 端口聚合查询。
+// ListPortViews 端口聚合查询（含租户名与设备归属账号）。
 func (s *Store) ListPortViews(ctx context.Context, tenantID int64) ([]PortView, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT p.id, d.device_uid, d.name, d.role, d.status, p.port, p.label, p.declared
-		FROM device_ports p JOIN devices d ON d.id=p.device_id
+	rows, err := s.DB.QueryContext(ctx, `SELECT p.id, d.device_uid, d.name, COALESCE(t.name,''), d.owner, d.role, d.status, p.port, p.label, p.declared
+		FROM device_ports p JOIN devices d ON d.id=p.device_id LEFT JOIN tenants t ON t.id=d.tenant_id
 		WHERE ($1::bigint IS NULL OR d.tenant_id=$1) ORDER BY d.device_uid, p.port`, tenantArg(tenantID))
 	if err != nil {
 		return nil, err
@@ -566,7 +580,7 @@ func (s *Store) ListPortViews(ctx context.Context, tenantID int64) ([]PortView, 
 	var out []PortView
 	for rows.Next() {
 		var v PortView
-		if err := rows.Scan(&v.ID, &v.DeviceUID, &v.DeviceName, &v.Role, &v.Status, &v.Port, &v.Label, &v.Declared); err != nil {
+		if err := rows.Scan(&v.ID, &v.DeviceUID, &v.DeviceName, &v.TenantName, &v.Owner, &v.Role, &v.Status, &v.Port, &v.Label, &v.Declared); err != nil {
 			return nil, err
 		}
 		out = append(out, v)
@@ -602,13 +616,15 @@ func (s *Store) AddRelayBytes(ctx context.Context, sessionID string, n int64) er
 	return err
 }
 
-// ListSessions 会话列表。
-func (s *Store) ListSessions(ctx context.Context, tenantID int64, status string) ([]TunnelSession, error) {
+// ListSessions 会话列表（含租户名与两端设备名/归属账号）。
+func (s *Store) ListSessions(ctx context.Context, tenantID int64, status string) ([]SessionView, error) {
 	q := `SELECT s.id, s.session_id, s.tenant_id, s.client_device_id, s.server_device_id,
-		COALESCE(cd.device_uid,''), COALESCE(sd.device_uid,''), s.port, s.mode, s.status, s.relay_bytes, s.started_at, s.ended_at
+		COALESCE(cd.device_uid,''), COALESCE(sd.device_uid,''), s.port, s.mode, s.status, s.relay_bytes, s.started_at, s.ended_at,
+		COALESCE(t.name,''), COALESCE(cd.name,''), COALESCE(sd.name,''), COALESCE(cd.owner,''), COALESCE(sd.owner,'')
 		FROM tunnel_sessions s
 		LEFT JOIN devices cd ON cd.id=s.client_device_id
 		LEFT JOIN devices sd ON sd.id=s.server_device_id
+		LEFT JOIN tenants t ON t.id=s.tenant_id
 		WHERE ($1::bigint IS NULL OR s.tenant_id=$1)`
 	args := []any{tenantArg(tenantID)}
 	if status != "" {
@@ -621,11 +637,12 @@ func (s *Store) ListSessions(ctx context.Context, tenantID int64, status string)
 		return nil, err
 	}
 	defer rows.Close()
-	var out []TunnelSession
+	var out []SessionView
 	for rows.Next() {
-		var v TunnelSession
+		var v SessionView
 		if err := rows.Scan(&v.ID, &v.SessionID, &v.TenantID, &v.ClientDeviceID, &v.ServerDeviceID,
-			&v.ClientUID, &v.ServerUID, &v.Port, &v.Mode, &v.Status, &v.RelayBytes, &v.StartedAt, &v.EndedAt); err != nil {
+			&v.ClientUID, &v.ServerUID, &v.Port, &v.Mode, &v.Status, &v.RelayBytes, &v.StartedAt, &v.EndedAt,
+			&v.TenantName, &v.ClientName, &v.ServerName, &v.ClientOwner, &v.ServerOwner); err != nil {
 			return nil, err
 		}
 		out = append(out, v)
@@ -660,8 +677,9 @@ func (s *Store) ListAudit(ctx context.Context, tenantID int64, action string, pa
 	if size < 1 || size > 200 {
 		size = 20
 	}
-	q := `SELECT id, tenant_id, actor, action, detail, client_ip, created_at FROM audit_logs` +
-		where + fmt.Sprintf(` ORDER BY id DESC LIMIT %d OFFSET %d`, size, (page-1)*size)
+	q := `SELECT a.id, a.tenant_id, COALESCE(t.name,''), a.actor, a.action, a.detail, a.client_ip, a.created_at
+		FROM audit_logs a LEFT JOIN tenants t ON t.id=a.tenant_id` +
+		where + fmt.Sprintf(` ORDER BY a.id DESC LIMIT %d OFFSET %d`, size, (page-1)*size)
 	rows, err := s.DB.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, 0, err
@@ -670,7 +688,7 @@ func (s *Store) ListAudit(ctx context.Context, tenantID int64, action string, pa
 	var out []AuditView
 	for rows.Next() {
 		var v AuditView
-		if err := rows.Scan(&v.ID, &v.TenantID, &v.Actor, &v.Action, &v.Detail, &v.ClientIP, &v.CreatedAt); err != nil {
+		if err := rows.Scan(&v.ID, &v.TenantID, &v.TenantName, &v.Actor, &v.Action, &v.Detail, &v.ClientIP, &v.CreatedAt); err != nil {
 			return nil, 0, err
 		}
 		out = append(out, v)
@@ -687,7 +705,8 @@ func (s *Store) InsertAlert(ctx context.Context, tenantID sql.NullInt64, level, 
 
 // ListAlerts 告警列表。
 func (s *Store) ListAlerts(ctx context.Context, tenantID int64, unreadOnly bool) ([]Alert, error) {
-	q := `SELECT id, tenant_id, level, title, detail, is_read, created_at FROM alerts WHERE ($1::bigint IS NULL OR tenant_id=$1)`
+	q := `SELECT al.id, al.tenant_id, COALESCE(t.name,''), al.level, al.title, al.detail, al.is_read, al.created_at
+		FROM alerts al LEFT JOIN tenants t ON t.id=al.tenant_id WHERE ($1::bigint IS NULL OR al.tenant_id=$1)`
 	if unreadOnly {
 		q += ` AND is_read=FALSE`
 	}
@@ -700,7 +719,7 @@ func (s *Store) ListAlerts(ctx context.Context, tenantID int64, unreadOnly bool)
 	var out []Alert
 	for rows.Next() {
 		var a Alert
-		if err := rows.Scan(&a.ID, &a.TenantID, &a.Level, &a.Title, &a.Detail, &a.IsRead, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.TenantID, &a.TenantName, &a.Level, &a.Title, &a.Detail, &a.IsRead, &a.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, a)

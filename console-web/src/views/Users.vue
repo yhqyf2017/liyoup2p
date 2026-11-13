@@ -27,7 +27,7 @@
     <div class="page-card table-card">
 
       <!-- 后端 UserView 无 JSON tag，字段为 PascalCase：ID / TenantID{Int64,Valid} / TenantName / Username / Role / Status / CreatedAt / LastLoginAt{Time,Valid} -->
-      <el-table v-loading="loading" :data="filteredList" style="width: 100%">
+      <el-table v-loading="loading" :data="filteredList" style="width: 100%" :span-method="tenantSpanMethod">
         <el-table-column label="ID" width="70" align="center">
           <template #default="{ row }"><span class="num">{{ row.ID }}</span></template>
         </el-table-column>
@@ -150,11 +150,38 @@ const currentUserId = computed(() => (store.user ? store.user.id : 0))
 const isSelf = (row) => row.ID === currentUserId.value
 const isSelfById = () => currentRow.value && currentRow.value.ID === currentUserId.value
 
+// 按租户聚合展示：同租户成员相邻，租户名为空（平台账号）排最后
 const filteredList = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
-  if (!kw) return list.value
-  return list.value.filter((u) => `${u.Username} ${u.TenantName || ''}`.toLowerCase().includes(kw))
+  const arr = kw
+    ? list.value.filter((u) => `${u.Username} ${u.TenantName || ''}`.toLowerCase().includes(kw))
+    : list.value.slice()
+  return arr.sort((a, b) => {
+    const an = a.TenantName || ''
+    const bn = b.TenantName || ''
+    if (!an && bn) return 1
+    if (an && !bn) return -1
+    return an.localeCompare(bn)
+  })
 })
+
+// 「所属租户」列（第 4 列）合并同租户单元格；仅一组（单租户视角）时正常整列合并显示
+const TENANT_COLUMN_INDEX = 3
+
+function tenantSpanMethod({ row, rowIndex, columnIndex }) {
+  if (columnIndex !== TENANT_COLUMN_INDEX) return
+  const rows = filteredList.value
+  const name = row.TenantName || ''
+  if (rowIndex > 0 && (rows[rowIndex - 1].TenantName || '') === name) {
+    return { rowspan: 0, colspan: 0 }
+  }
+  let rowspan = 1
+  for (let i = rowIndex + 1; i < rows.length; i++) {
+    if ((rows[i].TenantName || '') !== name) break
+    rowspan++
+  }
+  return { rowspan, colspan: 1 }
+}
 
 const roleOptions = computed(() => {
   if (isSuper()) {

@@ -55,6 +55,9 @@
           </template>
         </el-table-column>
         <el-table-column label="所属租户" prop="tenant_name" min-width="120" show-overflow-tooltip />
+        <el-table-column label="账号" prop="owner" min-width="110" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.owner || '—' }}</template>
+        </el-table-column>
         <el-table-column label="操作系统" prop="os_info" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">{{ row.os_info || '—' }}</template>
         </el-table-column>

@@ -37,7 +37,7 @@ func (a *DevicesAPI) List(w http.ResponseWriter, r *http.Request) {
 		items = append(items, map[string]any{
 			"id": d.ID, "tenant_id": d.TenantID, "tenant_name": d.TenantName,
 			"device_uid": d.DeviceUID, "name": d.Name, "role": d.Role,
-			"status": d.Status, "os_info": d.OSInfo, "port_count": d.PortCount,
+			"owner": d.Owner, "status": d.Status, "os_info": d.OSInfo, "port_count": d.PortCount,
 			"last_online_at": d.LastOnlineAt, "created_at": d.CreatedAt,
 		})
 	}
@@ -91,7 +91,7 @@ func (a *DevicesAPI) Register(w http.ResponseWriter, r *http.Request) {
 		if uid == "" {
 			uid = "LY" + req.Role[:1] + "-" + randomHex(6)
 		}
-		id, err := a.St.CreateDevice(ctx, tid, uid, req.Name, req.Role, "")
+		id, err := a.St.CreateDevice(ctx, tid, uid, req.Name, req.Role, "", actor.Username)
 		if err != nil {
 			Fail(w, http.StatusInternalServerError, 5000, "注册设备失败: "+err.Error())
 			return
@@ -102,6 +102,11 @@ func (a *DevicesAPI) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	if device == nil {
 		Fail(w, http.StatusInternalServerError, 5000, "注册设备失败")
+		return
+	}
+	// 归属账号跟随最近一次注册的登录用户（同机换账号登录即转移归属）
+	if err := a.St.SetDeviceOwner(ctx, device.ID, actor.Username); err != nil {
+		Fail(w, http.StatusInternalServerError, 5000, "记录设备归属账号失败: "+err.Error())
 		return
 	}
 	token, err := a.JWT.DeviceToken(device.ID, device.DeviceUID, device.TenantID, req.Name)

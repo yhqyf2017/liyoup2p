@@ -59,6 +59,7 @@ type Device struct {
 	Role         string // server | client
 	TokenHash    string
 	Status       string // online | offline | revoked
+	Owner        string // 归属账号（最近一次注册该设备的登录用户名）
 	OSInfo       string
 	LastOnlineAt sql.NullTime
 	CreatedAt    time.Time
@@ -83,6 +84,8 @@ type PortView struct {
 	ID         int64
 	DeviceUID  string
 	DeviceName string
+	TenantName string
+	Owner      string // 设备归属账号
 	Role       string
 	Status     string
 	Port       int
@@ -107,6 +110,16 @@ type TunnelSession struct {
 	EndedAt        sql.NullTime
 }
 
+// SessionView 会话列表视图（含租户名与两端设备名/归属账号）。
+type SessionView struct {
+	TunnelSession
+	TenantName  string
+	ClientName  string
+	ServerName  string
+	ClientOwner string
+	ServerOwner string
+}
+
 // AuditEntry 审计写入。
 type AuditEntry struct {
 	TenantID sql.NullInt64
@@ -118,24 +131,26 @@ type AuditEntry struct {
 
 // AuditView 审计查询行。
 type AuditView struct {
-	ID        int64
-	TenantID  sql.NullInt64
-	Actor     string
-	Action    string
-	Detail    string
-	ClientIP  sql.NullString
-	CreatedAt time.Time
+	ID         int64
+	TenantID   sql.NullInt64
+	TenantName string
+	Actor      string
+	Action     string
+	Detail     string
+	ClientIP   sql.NullString
+	CreatedAt  time.Time
 }
 
 // Alert 告警。
 type Alert struct {
-	ID        int64
-	TenantID  sql.NullInt64
-	Level     string
-	Title     string
-	Detail    string
-	IsRead    bool
-	CreatedAt time.Time
+	ID         int64
+	TenantID   sql.NullInt64
+	TenantName string
+	Level      string
+	Title      string
+	Detail     string
+	IsRead     bool
+	CreatedAt  time.Time
 }
 
 // Stats 平台统计。

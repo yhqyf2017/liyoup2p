@@ -140,6 +140,13 @@ func (h *Hub) ServeWS(w http.ResponseWriter, r *http.Request) {
 	if err := h.st.SetDeviceOnline(context.Background(), device.ID); err != nil {
 		log.Printf("[信令] 更新设备上线状态失败: %v", err)
 	}
+	// 连接时上报的操作系统信息（agent 连接 URL 带 os 参数；老版本 agent 无此参数则保持原值）
+	if osInfo := strings.TrimSpace(r.URL.Query().Get("os")); osInfo != "" && osInfo != device.OSInfo {
+		if err := h.st.SetDeviceOSInfo(context.Background(), device.ID, osInfo); err != nil {
+			log.Printf("[信令] 更新设备系统信息失败: %v", err)
+		}
+		c.device.OSInfo = osInfo
+	}
 	h.broadcastTo(c.device.TenantID, frame{Type: "device_online", Data: map[string]any{
 		"device_uid": c.device.DeviceUID, "name": c.device.Name, "role": c.device.Role,
 	}}, c.device.ID)

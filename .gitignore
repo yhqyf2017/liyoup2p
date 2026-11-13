@@ -52,3 +52,5 @@ dist/
 
 # ===== Trae 内部计划文档 =====
 .trae/
+
+console/

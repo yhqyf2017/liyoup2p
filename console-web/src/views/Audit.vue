@@ -35,6 +35,9 @@
           </template>
         </el-table-column>
         <el-table-column label="操作者" prop="actor" width="130" show-overflow-tooltip />
+        <el-table-column label="租户" prop="tenant_name" min-width="110" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.tenant_name || '—' }}</template>
+        </el-table-column>
         <el-table-column label="详情" min-width="220" show-overflow-tooltip>
           <template #default="{ row }">{{ row.detail || '—' }}</template>
         </el-table-column>

@@ -32,11 +32,27 @@
         <el-button :icon="Refresh" circle text @click="loadSessions" />
       </div>
       <el-table v-loading="loading" :data="sessions" style="width: 100%">
-        <el-table-column label="客户端" prop="client_device_uid" min-width="150">
-          <template #default="{ row }"><span class="mono">{{ row.client_device_uid }}</span></template>
+        <el-table-column label="客户端" min-width="170" show-overflow-tooltip>
+          <template #default="{ row }">
+            <div>
+              <span class="dev-name">{{ row.client_name || row.client_device_uid || '—' }}</span>
+              <span v-if="row.client_name" class="cell-uid">{{ row.client_device_uid }}</span>
+            </div>
+          </template>
         </el-table-column>
-        <el-table-column label="服务端" prop="server_device_uid" min-width="150">
-          <template #default="{ row }"><span class="mono">{{ row.server_device_uid }}</span></template>
+        <el-table-column label="服务端" min-width="170" show-overflow-tooltip>
+          <template #default="{ row }">
+            <div>
+              <span class="dev-name">{{ row.server_name || row.server_device_uid || '—' }}</span>
+              <span v-if="row.server_name" class="cell-uid">{{ row.server_device_uid }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="租户" prop="tenant_name" min-width="100" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.tenant_name || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="账号" prop="client_owner" min-width="110" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.client_owner || '—' }}</template>
         </el-table-column>
         <el-table-column label="端口" width="80" align="center">
           <template #default="{ row }"><span class="num">{{ row.port }}</span></template>
@@ -195,5 +211,17 @@ onMounted(() => {
   font-family: 'Consolas', 'Courier New', monospace;
   font-size: 12.5px;
   color: #57677F;
+}
+
+.dev-name {
+  display: block;
+  color: #16233C;
+}
+
+.cell-uid {
+  display: block;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11px;
+  color: #8C99AE;
 }
 </style>

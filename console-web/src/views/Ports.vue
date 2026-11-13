@@ -28,6 +28,12 @@
         <el-table-column label="设备名称" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ row.DeviceName || '—' }}</template>
         </el-table-column>
+        <el-table-column label="租户" min-width="110" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.TenantName || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="账号" min-width="110" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.Owner || '—' }}</template>
+        </el-table-column>
         <el-table-column label="角色" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="row.Role === 'server' ? 'primary' : 'success'" size="small" effect="light">
@@ -78,7 +84,7 @@ const list = ref([])
 const loading = ref(false)
 const keyword = ref('')
 
-// 后端 PortView 结构体无 JSON tag，字段为 PascalCase：ID / DeviceUID / DeviceName / Role / Status / Port / Label / Declared
+// 后端 PortView 结构体无 JSON tag，字段为 PascalCase：ID / DeviceUID / DeviceName / Role / Status / Port / Label / Declared / TenantName / Owner
 const filteredList = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
   if (!kw) return list.value
