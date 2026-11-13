@@ -154,7 +154,7 @@ import { fmtTime } from '../utils'
 const list = ref([])
 const loading = ref(false)
 const keyword = ref('')
-const tenantFilter = ref(0) // 0=全部，-1=平台账号，>0=租户 ID
+const tenantFilter = ref(null) // null=全部（显示占位符），-1=平台账号，>0=租户 ID
 const tenants = ref([])
 
 const currentUserId = computed(() => (store.user ? store.user.id : 0))
