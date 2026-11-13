@@ -1,6 +1,6 @@
 ; 励联 LiLink Win7 专用安装包（Inno Setup 6，Go 1.20 编译的 walk 版 GUI）
 ; 与主包（LiLink.iss）同 AppId：用户从 Win10 包换装 Win7 包不会装出两份。
-; 内嵌 amd64 产物；32 位 Win7 机器请分发 LiLink-pc-win7-<版本>-x86.zip。
+; 内嵌 amd64+386 双架构产物，安装时按系统位数自动选择，32/64 位 Win7 通用。
 #define MyAppName "励联LiLink"
 #define MyAppVersion "1.1.6"
 #define MyAppPublisher "济源市励友软件有限公司"
@@ -37,8 +37,11 @@ chs.AdditionalTasks=附加任务：
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalTasks}"
 
 [Files]
-Source: "..\dist\win7\LiYouP2P-amd64.exe"; DestName: "LiYouP2P.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\dist\win7\liyou-agent-amd64.exe"; DestName: "liyou-agent.exe"; DestDir: "{app}"; Flags: ignoreversion
+; 双架构通用安装包：安装时按系统位数自动选择对应 exe（32 位 Win7 装 386，64 位装 amd64）
+Source: "..\dist\win7\LiYouP2P-amd64.exe"; DestName: "LiYouP2P.exe"; DestDir: "{app}"; Check: IsWin64; Flags: ignoreversion
+Source: "..\dist\win7\LiYouP2P-386.exe"; DestName: "LiYouP2P.exe"; DestDir: "{app}"; Check: not IsWin64; Flags: ignoreversion
+Source: "..\dist\win7\liyou-agent-amd64.exe"; DestName: "liyou-agent.exe"; DestDir: "{app}"; Check: IsWin64; Flags: ignoreversion
+Source: "..\dist\win7\liyou-agent-386.exe"; DestName: "liyou-agent.exe"; DestDir: "{app}"; Check: not IsWin64; Flags: ignoreversion
 Source: "..\gui-wails\build\windows\icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
