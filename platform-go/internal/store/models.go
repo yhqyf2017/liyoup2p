@@ -79,20 +79,6 @@ type PortInput struct {
 	Declared bool
 }
 
-// PortView 端口聚合视图。
-type PortView struct {
-	ID         int64
-	DeviceUID  string
-	DeviceName string
-	TenantName string
-	Owner      string // 设备归属账号
-	Role       string
-	Status     string
-	Port       int
-	Label      string
-	Declared   bool
-}
-
 // TunnelSession 隧道会话。
 type TunnelSession struct {
 	ID             int64

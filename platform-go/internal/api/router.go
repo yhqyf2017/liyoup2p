@@ -55,8 +55,7 @@ func NewRouter(st *store.Store, jm *auth.Manager, kicker DeviceKicker, updateDir
 	mux.Handle("POST /api/devices/register", roles("super_admin", "tenant_admin", "operator")(devicesAPI.Register))
 	mux.Handle("DELETE /api/devices/{id}", roles("super_admin", "tenant_admin", "operator")(devicesAPI.Delete))
 
-	// 端口 / 审计 / 会话 / 告警 / 统计
-	mux.Handle("GET /api/ports", au(miscAPI.Ports))
+	// 审计 / 会话 / 告警 / 统计
 	mux.Handle("GET /api/audit", au(miscAPI.Audit))
 	mux.Handle("GET /api/sessions", au(miscAPI.Sessions))
 	mux.Handle("GET /api/alerts", au(miscAPI.Alerts))

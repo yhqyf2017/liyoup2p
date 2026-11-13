@@ -20,10 +20,6 @@
           <el-icon><Monitor /></el-icon>
           <span>设备管理</span>
         </el-menu-item>
-        <el-menu-item index="/ports">
-          <el-icon><Connection /></el-icon>
-          <span>服务端口</span>
-        </el-menu-item>
         <div class="menu-group-title">运营监控</div>
         <el-menu-item index="/audit">
           <el-icon><Document /></el-icon>

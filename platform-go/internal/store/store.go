@@ -568,26 +568,6 @@ func (s *Store) ReplaceDevicePorts(ctx context.Context, deviceID int64, ports []
 	return tx.Commit()
 }
 
-// ListPortViews 端口聚合查询（含租户名与设备归属账号）。
-func (s *Store) ListPortViews(ctx context.Context, tenantID int64) ([]PortView, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT p.id, d.device_uid, d.name, COALESCE(t.name,''), d.owner, d.role, d.status, p.port, p.label, p.declared
-		FROM device_ports p JOIN devices d ON d.id=p.device_id LEFT JOIN tenants t ON t.id=d.tenant_id
-		WHERE ($1::bigint IS NULL OR d.tenant_id=$1) ORDER BY d.device_uid, p.port`, tenantArg(tenantID))
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var out []PortView
-	for rows.Next() {
-		var v PortView
-		if err := rows.Scan(&v.ID, &v.DeviceUID, &v.DeviceName, &v.TenantName, &v.Owner, &v.Role, &v.Status, &v.Port, &v.Label, &v.Declared); err != nil {
-			return nil, err
-		}
-		out = append(out, v)
-	}
-	return out, rows.Err()
-}
-
 // ---------- 会话 ----------
 
 // CreateSession 创建隧道会话记录。

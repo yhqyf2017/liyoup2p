@@ -5,20 +5,9 @@ import (
 	"strconv"
 )
 
-// MiscAPI 端口 / 审计 / 会话 / 告警 / 统计处理器。
+// MiscAPI 审计 / 会话 / 告警 / 统计处理器。
 type MiscAPI struct {
 	St storeIface
-}
-
-// Ports 端口聚合查询。
-func (a *MiscAPI) Ports(w http.ResponseWriter, r *http.Request) {
-	u := CurrentUser(r)
-	ports, err := a.St.ListPortViews(r.Context(), tenantScope(r, u))
-	if err != nil {
-		Fail(w, http.StatusInternalServerError, 5000, "查询端口失败: "+err.Error())
-		return
-	}
-	OK(w, map[string]any{"items": ports, "total": len(ports)})
 }
 
 // Audit 审计日志分页查询。

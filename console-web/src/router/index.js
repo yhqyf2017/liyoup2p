@@ -14,7 +14,6 @@ const routes = [
     children: [
       { path: 'dashboard', component: () => import('../views/Dashboard.vue'), meta: { title: '工作台' } },
       { path: 'devices', component: () => import('../views/Devices.vue'), meta: { title: '设备管理' } },
-      { path: 'ports', component: () => import('../views/Ports.vue'), meta: { title: '服务端口' } },
       { path: 'audit', component: () => import('../views/Audit.vue'), meta: { title: '访问审计' } },
       { path: 'alerts', component: () => import('../views/Alerts.vue'), meta: { title: '告警中心' } },
       { path: 'users', component: () => import('../views/Users.vue'), meta: { title: '成员管理' } },
