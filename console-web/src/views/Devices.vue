@@ -13,6 +13,16 @@
     </div>
 
     <div class="filter-card">
+      <el-select
+        v-if="isSuper()"
+        v-model="filterTenant"
+        clearable
+        placeholder="全部租户"
+        style="width: 180px"
+      >
+        <el-option label="平台设备" :value="-1" />
+        <el-option v-for="t in tenants" :key="t.id" :label="`${t.name}（${t.code}）`" :value="t.id" />
+      </el-select>
       <el-select v-model="filterRole" placeholder="设备角色" clearable style="width: 150px" @change="load">
         <el-option label="服务端" value="server" />
         <el-option label="客户端" value="client" />
@@ -24,10 +34,10 @@
       </el-select>
       <el-input
         v-model="keyword"
-        placeholder="搜索设备 UID / 名称"
+        placeholder="搜索设备 UID / 名称 / 账号 / 租户"
         clearable
         :prefix-icon="Search"
-        style="width: 220px"
+        style="width: 240px"
       />
       <div class="f-spacer"></div>
       <el-button :icon="Refresh" circle text @click="load" />
@@ -35,7 +45,7 @@
 
     <div class="page-card table-card">
 
-      <el-table v-loading="loading" :data="filteredList" style="width: 100%">
+      <el-table v-loading="loading" :data="pagedList" height="100%" style="width: 100%">
         <el-table-column label="设备 UID" prop="device_uid" min-width="160">
           <template #default="{ row }"><span class="mono">{{ row.device_uid }}</span></template>
         </el-table-column>
@@ -79,7 +89,15 @@
           <el-empty description="暂无设备，点击右上角「注册设备」开始接入" :image-size="80" />
         </template>
       </el-table>
-      <div class="table-foot num">共 {{ filteredList.length }} 台设备</div>
+      <el-pagination
+        v-model:current-page="page"
+        v-model:page-size="pageSize"
+        :total="filteredList.length"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        background
+        class="table-pager"
+      />
     </div>
 
     <!-- 注册设备 -->
@@ -157,7 +175,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, Refresh, Search, CopyDocument } from '@element-plus/icons-vue'
 import http from '../api'
@@ -173,15 +191,48 @@ const list = ref([])
 const loading = ref(false)
 const filterRole = ref('')
 const filterStatus = ref('')
+const filterTenant = ref(null) // null=全部（显示占位符），-1=平台设备，>0=租户 ID
 const keyword = ref('')
+const tenants = ref([])
 
 const filteredList = computed(() => {
+  let arr = list.value
+  const tf = filterTenant.value || 0
+  if (isSuper() && tf !== 0) {
+    arr = arr.filter((d) => (tf === -1 ? !d.tenant_id : d.tenant_id === tf))
+  }
   const kw = keyword.value.trim().toLowerCase()
-  return list.value.filter((d) => {
-    if (kw && !`${d.device_uid} ${d.name}`.toLowerCase().includes(kw)) return false
-    return true
-  })
+  if (kw) {
+    arr = arr.filter(
+      (d) => `${d.device_uid} ${d.name} ${d.owner || ''} ${d.tenant_name || ''}`.toLowerCase().includes(kw)
+    )
+  }
+  return arr
 })
+
+// 前端分页
+const page = ref(1)
+const pageSize = ref(20)
+const pagedList = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return filteredList.value.slice(start, start + pageSize.value)
+})
+
+// 过滤条件变化时回到第 1 页
+watch([keyword, filterTenant, filterRole, filterStatus, pageSize], () => {
+  page.value = 1
+})
+
+async function ensureTenants() {
+  if (isSuper() && tenants.value.length === 0) {
+    try {
+      const data = await http.get('/api/tenants', { silent: true })
+      tenants.value = data.items || []
+    } catch {
+      tenants.value = []
+    }
+  }
+}
 
 async function load() {
   loading.value = true
@@ -199,19 +250,11 @@ async function load() {
 // 注册
 const regVisible = ref(false)
 const regLoading = ref(false)
-const tenants = ref([])
 const regForm = ref({ device_uid: '', name: '', role: 'server', tenant_id: null })
 
 async function openRegister() {
   regForm.value = { device_uid: '', name: '', role: 'server', tenant_id: null }
-  if (isSuper() && tenants.value.length === 0) {
-    try {
-      const data = await http.get('/api/tenants', { silent: true })
-      tenants.value = data.items || []
-    } catch {
-      tenants.value = []
-    }
-  }
+  if (isSuper()) await ensureTenants()
   regVisible.value = true
 }
 
@@ -276,18 +319,25 @@ async function doRevoke() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  ensureTenants()
+})
 </script>
 
 <style scoped>
 .table-card {
   padding: var(--sp-3);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.table-foot {
-  padding: var(--sp-2) var(--sp-2) 0;
-  font-size: 12.5px;
-  color: var(--app-text-3);
+.table-card > :deep(.el-table) {
+  flex: 1;
+  min-height: 0;
 }
 
 .mono {

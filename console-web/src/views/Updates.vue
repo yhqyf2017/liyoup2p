@@ -219,6 +219,11 @@ onMounted(loadAll)
 </script>
 
 <style scoped>
+/* 版本发布为非表格页：内容超出视口时在页面内滚动 */
+.page-view {
+  overflow-y: auto;
+}
+
 .channel-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

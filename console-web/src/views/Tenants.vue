@@ -24,7 +24,7 @@
 
     <div class="page-card table-card">
 
-      <el-table v-loading="loading" :data="filteredList" style="width: 100%">
+      <el-table v-loading="loading" :data="pagedList" height="100%" style="width: 100%">
         <el-table-column label="ID" prop="id" sortable width="90" align="center">
           <template #default="{ row }"><span class="num">{{ row.id }}</span></template>
         </el-table-column>
@@ -64,7 +64,15 @@
           <el-empty description="暂无租户" :image-size="80" />
         </template>
       </el-table>
-      <div class="table-foot num">共 {{ filteredList.length }} 个租户</div>
+      <el-pagination
+        v-model:current-page="page"
+        v-model:page-size="pageSize"
+        :total="filteredList.length"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        background
+        class="table-pager"
+      />
     </div>
 
     <!-- 新建 / 编辑 -->
@@ -96,7 +104,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import http from '../api'
@@ -110,6 +118,19 @@ const filteredList = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
   if (!kw) return list.value
   return list.value.filter((t) => `${t.name} ${t.code}`.toLowerCase().includes(kw))
+})
+
+// 前端分页
+const page = ref(1)
+const pageSize = ref(20)
+const pagedList = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return filteredList.value.slice(start, start + pageSize.value)
+})
+
+// 过滤条件变化时回到第 1 页
+watch([keyword, pageSize], () => {
+  page.value = 1
 })
 
 async function load() {
@@ -188,12 +209,16 @@ onMounted(load)
 <style scoped>
 .table-card {
   padding: var(--sp-3);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.table-foot {
-  padding: var(--sp-2) var(--sp-2) 0;
-  font-size: 12.5px;
-  color: var(--app-text-3);
+.table-card > :deep(.el-table) {
+  flex: 1;
+  min-height: 0;
 }
 
 .mono {

@@ -160,11 +160,14 @@ body {
   transform: translateY(-1px);
 }
 
-/* 页面通用布局：四段式（页头/筛选/表格/分页），段间 16-20px */
+/* 页面通用布局：四段式（页头/筛选/表格/分页），段间 16-20px
+   页面根容器在 Layout.main（纵向 flex）内撑满，表格页在卡片内部滚动 */
 .page-view {
   display: flex;
   flex-direction: column;
   gap: var(--sp-4);
+  flex: 1;
+  min-height: 0;
 }
 
 /* 页头：标题 + 描述 + 主操作（与内容区间距 20px = gap 16 + 4） */
@@ -226,6 +229,14 @@ body {
   font-size: 13px;
   color: var(--app-text-3);
   margin-top: 2px;
+}
+
+/* 表格分页条：固定在表格卡片底部，右对齐 */
+.table-pager {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: var(--sp-3);
 }
 
 /* 表格微调 */

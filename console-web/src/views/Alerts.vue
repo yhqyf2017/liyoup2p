@@ -18,7 +18,7 @@
 
     <div class="page-card table-card">
 
-      <el-table v-loading="loading" :data="items" style="width: 100%" :row-class-name="rowClass">
+      <el-table v-loading="loading" :data="pagedList" height="100%" style="width: 100%" :row-class-name="rowClass">
         <el-table-column label="级别" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="ALERT_LEVEL_TAG_TYPES[row.level] || 'info'" size="small" effect="light">
@@ -61,12 +61,21 @@
           <el-empty description="暂无告警，系统运行良好" :image-size="80" />
         </template>
       </el-table>
+      <el-pagination
+        v-model:current-page="page"
+        v-model:page-size="pageSize"
+        :total="items.length"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        background
+        class="table-pager"
+      />
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import http, { refreshAlertUnread } from '../api'
@@ -79,6 +88,18 @@ const loading = ref(false)
 const readAllLoading = ref(false)
 
 const unreadCount = computed(() => items.value.filter((a) => !a.is_read).length)
+
+// 前端分页（/api/alerts 一次返回全量列表）
+const page = ref(1)
+const pageSize = ref(20)
+const pagedList = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return items.value.slice(start, start + pageSize.value)
+})
+
+watch(pageSize, () => {
+  page.value = 1
+})
 
 function rowClass({ row }) {
   return row.is_read ? 'row-read' : ''
@@ -121,6 +142,16 @@ onMounted(load)
 <style scoped>
 .table-card {
   padding: var(--sp-3);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.table-card > :deep(.el-table) {
+  flex: 1;
+  min-height: 0;
 }
 
 .unread-count {

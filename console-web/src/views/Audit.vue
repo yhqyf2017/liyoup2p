@@ -20,7 +20,7 @@
 
     <div class="page-card table-card">
 
-      <el-table v-loading="loading" :data="items" style="width: 100%">
+      <el-table v-loading="loading" :data="items" height="100%" style="width: 100%">
         <el-table-column label="ID" prop="id" width="70" align="center">
           <template #default="{ row }"><span class="num">{{ row.id }}</span></template>
         </el-table-column>
@@ -51,18 +51,17 @@
         </template>
       </el-table>
 
-      <div class="pager-row">
-        <el-pagination
-          v-model:current-page="page"
-          v-model:page-size="pageSize"
-          :total="total"
-          :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next, jumper"
-          background
-          @current-change="load"
-          @size-change="onSizeChange"
-        />
-      </div>
+      <el-pagination
+        v-model:current-page="page"
+        v-model:page-size="pageSize"
+        :total="total"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        background
+        class="table-pager"
+        @current-change="load"
+        @size-change="onSizeChange"
+      />
     </div>
   </div>
 </template>
@@ -109,12 +108,16 @@ onMounted(load)
 <style scoped>
 .table-card {
   padding: var(--sp-3);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.pager-row {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--sp-4);
+.table-card > :deep(.el-table) {
+  flex: 1;
+  min-height: 0;
 }
 
 .mono {

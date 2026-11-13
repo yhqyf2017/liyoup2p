@@ -37,7 +37,7 @@
     <div class="page-card table-card">
 
       <!-- 后端 UserView 无 JSON tag，字段为 PascalCase：ID / TenantID{Int64,Valid} / TenantName / Username / Role / Status / CreatedAt / LastLoginAt{Time,Valid} -->
-      <el-table v-loading="loading" :data="filteredList" style="width: 100%" :span-method="tenantSpanMethod">
+      <el-table v-loading="loading" :data="pagedList" height="100%" style="width: 100%" :span-method="tenantSpanMethod">
         <el-table-column label="ID" prop="ID" sortable width="90" align="center">
           <template #default="{ row }"><span class="num">{{ row.ID }}</span></template>
         </el-table-column>
@@ -81,7 +81,15 @@
           <el-empty description="暂无成员账号" :image-size="80" />
         </template>
       </el-table>
-      <div class="table-foot num">共 {{ filteredList.length }} 名成员</div>
+      <el-pagination
+        v-model:current-page="page"
+        v-model:page-size="pageSize"
+        :total="filteredList.length"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        background
+        class="table-pager"
+      />
     </div>
 
     <!-- 新建 / 编辑 -->
@@ -144,7 +152,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Search } from '@element-plus/icons-vue'
 import http from '../api'
@@ -184,12 +192,25 @@ const filteredList = computed(() => {
   })
 })
 
+// 前端分页
+const page = ref(1)
+const pageSize = ref(20)
+const pagedList = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  return filteredList.value.slice(start, start + pageSize.value)
+})
+
+// 过滤条件变化时回到第 1 页
+watch([keyword, tenantFilter, pageSize], () => {
+  page.value = 1
+})
+
 // 「所属租户」列（第 4 列）合并同租户单元格；仅一组（单租户视角）时正常整列合并显示
 const TENANT_COLUMN_INDEX = 3
 
 function tenantSpanMethod({ row, rowIndex, columnIndex }) {
   if (columnIndex !== TENANT_COLUMN_INDEX) return
-  const rows = filteredList.value
+  const rows = pagedList.value
   const name = row.TenantName || ''
   if (rowIndex > 0 && (rows[rowIndex - 1].TenantName || '') === name) {
     return { rowspan: 0, colspan: 0 }
@@ -348,12 +369,16 @@ onMounted(() => {
 <style scoped>
 .table-card {
   padding: var(--sp-3);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.table-foot {
-  padding: var(--sp-2) var(--sp-2) 0;
-  font-size: 12.5px;
-  color: var(--app-text-3);
+.table-card > :deep(.el-table) {
+  flex: 1;
+  min-height: 0;
 }
 
 .username {

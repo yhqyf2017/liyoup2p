@@ -154,6 +154,11 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* 工作台为非表格页：内容超出视口时在页面内滚动 */
+.page-view {
+  overflow-y: auto;
+}
+
 .kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

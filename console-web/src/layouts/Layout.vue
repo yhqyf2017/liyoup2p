@@ -43,7 +43,6 @@
           <span>版本发布</span>
         </el-menu-item>
       </el-menu>
-      <div class="aside-footer">励联 LiLink 平台 v1.0 · © 2026 济源市励友软件有限公司</div>
     </aside>
 
     <div class="layout-right">
@@ -235,13 +234,6 @@ function logout() {
   letter-spacing: 1px;
 }
 
-.aside-footer {
-  padding: 12px 18px;
-  font-size: 12px;
-  color: var(--app-text-3);
-  border-top: 1px solid var(--app-border);
-}
-
 .layout-right {
   flex: 1;
   display: flex;
@@ -285,7 +277,16 @@ function logout() {
 
 .layout-main {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   padding: var(--sp-5) var(--sp-6);
+}
+
+/* 页面根容器撑满 main，高度透传给内部自适应表格 */
+.layout-main > :deep(*) {
+  flex: 1;
+  min-height: 0;
 }
 </style>
