@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>励联 LiLink 防勒索品牌长图</title>
+<style>
+  :root{
+    --blue:#1667C8; --deep:#0F51A8; --sky:#2AA4E9; --gold:#F5A623;
+    --ink:#12233F; --muted:#5B6B84; --rule:#E4EAF3; --bg:#F5F8FD;
+    --danger:#D64545; --safe:#1B9E6D;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{width:750px;font-family:"HarmonyOS Sans SC","Microsoft YaHei","PingFang SC",sans-serif;background:#fff;color:var(--ink);-webkit-font-smoothing:antialiased;}
+
+  /* ============ S1 主视觉：防勒索 ============ */
+  .hero{position:relative;height:560px;background:linear-gradient(160deg,#0B3E86 0%,var(--deep) 42%,#1667C8 100%);overflow:hidden;padding-top:52px;}
+  .hero .grid-bg{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:44px 44px;}
+  .hero .glow{position:absolute;width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,rgba(42,164,233,.35),transparent 65%);top:-120px;right:-140px;}
+  .hero .glow2{position:absolute;width:420px;height:420px;border-radius:50%;background:radial-gradient(circle,rgba(245,166,35,.18),transparent 65%);bottom:-160px;left:-120px;}
+  .hero-inner{position:relative;text-align:center;}
+  .hero-brand{display:flex;align-items:center;justify-content:center;gap:12px;}
+  .hero-brand img{width:64px;height:64px;object-fit:contain;filter:drop-shadow(0 4px 12px rgba(0,0,0,.35));}
+  .hero-brand span{color:#fff;font-size:30px;font-weight:800;letter-spacing:2px;text-shadow:0 2px 10px rgba(0,0,0,.3);}
+  .hero h1{margin-top:34px;color:#fff;font-size:64px;font-weight:900;letter-spacing:6px;text-shadow:0 4px 18px rgba(9,40,90,.5);}
+  .hero h1 em{font-style:normal;color:var(--gold);}
+  .hero .sub{margin-top:18px;color:#CFE2FA;font-size:24px;letter-spacing:3px;}
+  .shield-wrap{position:relative;margin:36px auto 0;width:380px;height:210px;}
+  .shield{position:absolute;left:50%;top:8px;transform:translateX(-50%);width:170px;height:196px;z-index:1;}
+  .attacks{position:absolute;top:6px;width:100%;z-index:2;}
+  .atk{position:absolute;font-size:15px;color:#FFB3B3;background:rgba(150,30,30,.45);border:1px solid rgba(255,120,120,.5);padding:4px 10px;border-radius:999px;white-space:nowrap;}
+  .atk i{display:inline-block;width:18px;height:18px;line-height:18px;border-radius:50%;background:var(--danger);color:#fff;font-style:normal;font-weight:900;font-size:12px;text-align:center;margin-left:8px;vertical-align:-3px;box-shadow:0 0 10px rgba(214,69,69,.8);}
+  .atk.a1{left:-70px;top:30px;transform:rotate(-8deg);}
+  .atk.a2{right:-80px;top:78px;transform:rotate(7deg);}
+  .atk.a3{left:-56px;top:130px;transform:rotate(5deg);}
+  .atk-line{position:absolute;height:2px;background:linear-gradient(90deg,transparent,rgba(255,110,110,.75));}
+  .blk{position:absolute;right:118px;width:22px;height:22px;border-radius:50%;background:var(--danger);color:#fff;font-size:14px;font-weight:900;line-height:22px;text-align:center;box-shadow:0 0 14px rgba(214,69,69,.9);}
+  .hero-tags{display:flex;justify-content:center;gap:14px;margin-top:34px;}
+  .hero-tags span{color:#fff;font-size:18px;letter-spacing:1px;padding:9px 22px;border-radius:999px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);}
+
+  /* ============ 通用区块 ============ */
+  .sec{padding:56px 44px;}
+  .sec-head{text-align:center;margin-bottom:36px;}
+  .sec-head .kicker{display:inline-block;font-size:17px;font-weight:700;color:var(--blue);letter-spacing:4px;padding:6px 18px;border-radius:999px;background:#E8F1FC;}
+  .sec-head h2{margin-top:14px;font-size:38px;font-weight:900;letter-spacing:2px;}
+  .sec-head p{margin-top:10px;color:var(--muted);font-size:19px;}
+  .bar{width:72px;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--blue),var(--sky));margin:16px auto 0;}
+
+  /* ============ S2 风险对比 ============ */
+  .risk{background:#fff;}
+  .vs{display:flex;gap:20px;}
+  .vs-card{flex:1;border-radius:20px;padding:30px 26px;position:relative;}
+  .vs-card.bad{background:#FEF3F2;border:2px solid #F6C9C5;}
+  .vs-card.good{background:#EFFBF6;border:2px solid #BFE8D4;}
+  .vs-tag{display:inline-block;font-size:17px;font-weight:800;padding:6px 18px;border-radius:999px;color:#fff;}
+  .bad .vs-tag{background:var(--danger);}
+  .good .vs-tag{background:var(--safe);}
+  .vs-card h3{margin-top:16px;font-size:25px;font-weight:800;line-height:1.4;}
+  .vs-card ul{margin-top:14px;list-style:none;}
+  .vs-card li{position:relative;padding-left:26px;font-size:18px;color:#3D4E68;line-height:1.65;margin-bottom:9px;}
+  .bad li::before{content:"✕";position:absolute;left:0;color:var(--danger);font-weight:900;}
+  .good li::before{content:"✓";position:absolute;left:0;color:var(--safe);font-weight:900;}
+  .vs-note{margin-top:26px;text-align:center;font-size:19px;color:var(--ink);background:#FFF8EA;border:1px solid #F3DCA8;border-radius:14px;padding:16px 20px;line-height:1.6;}
+  .vs-note b{color:#B07A00;}
+
+  /* ============ S3 三大保障 ============ */
+  .guards{background:var(--bg);}
+  .g-card{background:#fff;border:1px solid var(--rule);border-radius:20px;padding:30px 28px;margin-bottom:20px;display:flex;gap:22px;align-items:flex-start;box-shadow:0 4px 18px rgba(18,42,84,.06);}
+  .g-ico{flex:none;width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;}
+  .g-ico.b1{background:#E8F1FC;}
+  .g-ico.b2{background:#FFF4E3;}
+  .g-ico.b3{background:#E9F7F1;}
+  .g-card h3{font-size:24px;font-weight:800;}
+  .g-card h3 small{font-size:15px;font-weight:700;color:#fff;background:var(--blue);border-radius:6px;padding:3px 10px;margin-left:10px;vertical-align:3px;}
+  .g-card p{margin-top:8px;font-size:18px;color:var(--muted);line-height:1.7;}
+
+  /* ============ S4 三步上手 ============ */
+  .steps{background:#fff;}
+  .step{display:flex;align-items:center;gap:24px;padding:22px 0;border-bottom:1px dashed var(--rule);}
+  .step:last-child{border-bottom:none;}
+  .step-num{flex:none;width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--sky));color:#fff;font-size:26px;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(22,103,200,.35);}
+  .step h3{font-size:23px;font-weight:800;}
+  .step p{margin-top:5px;font-size:18px;color:var(--muted);}
+
+  /* ============ S5 底部 ============ */
+  .footer{background:linear-gradient(160deg,var(--deep),#1667C8 70%);text-align:center;padding:64px 44px 70px;position:relative;overflow:hidden;}
+  .footer .grid-bg{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:44px 44px;}
+  .footer-inner{position:relative;}
+  .footer img{width:76px;height:76px;object-fit:contain;filter:drop-shadow(0 4px 12px rgba(0,0,0,.35));}
+  .footer h2{margin-top:18px;color:#fff;font-size:34px;font-weight:900;letter-spacing:3px;}
+  .footer p{margin-top:12px;color:#BFDCFA;font-size:20px;line-height:1.7;}
+  .footer .cta{display:inline-block;margin-top:30px;background:var(--gold);color:#3A2500;font-size:24px;font-weight:900;letter-spacing:2px;padding:16px 58px;border-radius:999px;box-shadow:0 8px 24px rgba(0,0,0,.28);}
+</style>
+</head>
+<body>
+
+  <!-- S1 主视觉 -->
+  <div class="hero">
+    <div class="grid-bg"></div><div class="glow"></div><div class="glow2"></div>
+    <div class="hero-inner">
+      <div class="hero-brand"><img src="assets/logo.png" alt="励联 LiLink"><span>励联 LiLink</span></div>
+      <h1>防勒索 · <em>内网穿透</em></h1>
+      <div class="sub">服务器不开一个公网端口，勒索病毒无处下手</div>
+      <div class="shield-wrap">
+        <div class="attacks">
+          <span class="atk a1">勒索病毒扫描<i>✕</i></span>
+          <span class="atk a2">黑客爆破端口<i>✕</i></span>
+          <span class="atk a3">木马渗透探测<i>✕</i></span>
+        </div>
+        <svg class="shield" viewBox="0 0 170 196" fill="none">
+          <path d="M85 4L12 30v52c0 47 30 84 73 110 43-26 73-63 73-110V30L85 4z" fill="url(#sg)" stroke="#fff" stroke-width="5"/>
+          <rect x="58" y="84" width="54" height="42" rx="8" fill="#fff"/>
+          <path d="M68 84v-12a17 17 0 0134 0v12" stroke="#fff" stroke-width="9" fill="none"/>
+          <circle cx="85" cy="103" r="8" fill="#1667C8"/>
+          <defs><linearGradient id="sg" x1="12" y1="4" x2="158" y2="192"><stop stop-color="#2AA4E9"/><stop offset="1" stop-color="#0F51A8"/></linearGradient></defs>
+        </svg>
+      </div>
+      <div class="hero-tags"><span>零端口暴露</span><span>P2P 加密直连</span><span>跨网安全访问</span></div>
+    </div>
+  </div>
+
+  <!-- S2 风险对比 -->
+  <div class="sec risk">
+    <div class="sec-head">
+      <span class="kicker">为什么怕勒索病毒</span>
+      <h2>开一个端口，就多一扇危险之门</h2>
+      <div class="bar"></div>
+    </div>
+    <div class="vs">
+      <div class="vs-card bad">
+        <span class="vs-tag">传统远程方式</span>
+        <h3>服务器暴露公网端口</h3>
+        <ul>
+          <li>端口常年暴露，黑客全天候扫描</li>
+          <li>弱口令、漏洞被爆破只是时间问题</li>
+          <li>一旦中招，文件被加密、业务停摆</li>
+          <li>勒索金额动辄数万起，还可能被二次勒索</li>
+        </ul>
+      </div>
+      <div class="vs-card good">
+        <span class="vs-tag">励联 LiLink</span>
+        <h3>服务器零端口暴露</h3>
+        <ul>
+          <li>服务端不开任何公网端口，攻击面为零</li>
+          <li>两端主动出站连接，主动拒绝陌生探测</li>
+          <li>内网主机白名单，非授权访问直接拦截</li>
+          <li>通道端到端加密，数据全程不可窃听</li>
+        </ul>
+      </div>
+    </div>
+    <div class="vs-note">防勒索的第一步，不是装更多杀毒软件，<b>而是让黑客根本找不到门</b>。</div>
+  </div>
+
+  <!-- S3 三大保障 -->
+  <div class="sec guards">
+    <div class="sec-head">
+      <span class="kicker">三重安全保障</span>
+      <h2>看不见，进不来，拆不开</h2>
+      <div class="bar"></div>
+    </div>
+    <div class="g-card">
+      <div class="g-ico b1"><svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M12 3l8 3v5c0 4.6-3.2 8.3-8 9.5C7.2 19.3 4 15.6 4 11V6l8-3z" stroke="#1667C8" stroke-width="2" stroke-linejoin="round"/><path d="M9 11.5l2 2 4-4" stroke="#1667C8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div><h3>看不见<small>零端口</small></h3><p>公司服务器不开放任何公网端口，全网扫描扫不到、端口探测探不明，勒索病毒连攻击目标都找不到。</p></div>
+    </div>
+    <div class="g-card">
+      <div class="g-ico b3"><svg width="36" height="36" viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2.5" stroke="#1B9E6D" stroke-width="2"/><path d="M8 10V7a4 4 0 018 0v3" stroke="#1B9E6D" stroke-width="2"/><circle cx="12" cy="15" r="1.8" fill="#1B9E6D"/></svg></div>
+      <div><h3>进不来<small>白名单</small></h3><p>设备实名注册、租户完全隔离、访问主机白名单管控，陌生设备与未授权主机一律拒绝，从机制上杜绝入侵。</p></div>
+    </div>
+    <div class="g-card">
+      <div class="g-ico b2"><svg width="36" height="36" viewBox="0 0 24 24" fill="none"><path d="M4 12h4l2-5 4 10 2-5h4" stroke="#F5A623" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div><h3>拆不开<small>强加密</small></h3><p>隧道数据 AES-GCM 端到端加密，密钥逐会话协商；即使链路被截获，拿到手的也只是无法解密的乱码。</p></div>
+    </div>
+  </div>
+
+  <!-- S4 三步上手 -->
+  <div class="sec steps">
+    <div class="sec-head">
+      <span class="kicker">三步上手</span>
+      <h2>不用改网络，不用开防火墙</h2>
+      <div class="bar"></div>
+    </div>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div><h3>公司电脑装好励联，选择「服务端」</h3><p>登录账号即完成注册，服务器始终零端口暴露，后台静默守护。</p></div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div><h3>外地电脑 / 手机装好励联，选择「客户端」</h3><p>同一个账号登录，配置一条端口映射规则即可，全程加密。</p></div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div><h3>像在办公室一样直连公司内网</h3><p>远程桌面、财务软件、ERP、NAS 照常用，人在外，数据在兜里。</p></div>
+    </div>
+  </div>
+
+  <!-- S5 底部 -->
+  <div class="footer">
+    <div class="grid-bg"></div>
+    <div class="footer-inner">
+      <img src="assets/logo.png" alt="励联 LiLink">
+      <h2>励联 LiLink</h2>
+      <p>防勒索 · 零端口 · P2P 直连<br>让每一台服务器，都成为黑客找不到的孤岛</p>
+      <span class="cta">立即下载体验</span>
+    </div>
+  </div>
+
+</body>
+</html>

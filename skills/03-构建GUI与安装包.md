@@ -24,6 +24,7 @@ Copy-Item build\bin\LiYouP2P.exe ..\LiYouP2P.exe -Force   # iss 引用仓库根�
 - 品牌图标源：`build\appicon.png`（512px）→ wails 自动生成各尺寸 + `build\windows\icon.ico`
 - 前端改动无需单独 npm build，`wails build` 自带前端构建（frontend/dist 为产物，gitignore）
 - windowsgui 无控制台：升级关键节点写文件日志 `%ProgramData%\LiLink\update.log`，自动化验证看这里
+- **默认管理员运行**：`build\windows\wails.exe.manifest` 内 trustInfo = requireAdministrator（2026-11-13 起，解决 Access is denied）；每次启动弹 UAC，Win10/11 开机自启可能被拦截。验证：读 exe 原始字节搜 `requireAdministrator`
 
 ## 3. Inno Setup 打包
 

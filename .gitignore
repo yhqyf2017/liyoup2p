@@ -49,3 +49,6 @@ Thumbs.db
 
 dist/
 *.exe~
+
+# ===== Trae 内部计划文档 =====
+.trae/
