@@ -111,11 +111,11 @@ func runUI(a *App) error {
 		return fmt.Errorf("加载图标失败：%w", err)
 	}
 
-	// 登录页子项（先组装，再按开发模式追加平台地址行）
-	loginChildren := []Widget{
+	// 登录页表单（Grid 两列：标签 | 输入框，先组装，再按开发模式追加平台地址行）
+	formChildren := []Widget{
 		Label{Text: "角色："},
 		Composite{
-			Layout: HBox{Margins: Margins{}, Spacing: 20},
+			Layout: HBox{Margins: Margins{}, Spacing: 16},
 			Children: []Widget{
 				RadioButton{AssignTo: &ui.rbClient, Text: "客户端（映射服务器端口到本机）"},
 				RadioButton{AssignTo: &ui.rbServer, Text: "服务端（供他人访问内网）"},
@@ -131,42 +131,63 @@ func runUI(a *App) error {
 		LineEdit{AssignTo: &ui.edDev, CueBanner: "留空使用本机名", Text: saved.DevName},
 	}
 	if devMode {
-		loginChildren = append(loginChildren,
+		formChildren = append(formChildren,
 			Label{Text: "平台地址："},
 			LineEdit{AssignTo: &ui.edPlatform, CueBanner: "http://…（开发调试用）", Text: saved.Platform},
 		)
 	}
-	loginChildren = append(loginChildren,
-		Label{Text: ""},
-		PushButton{AssignTo: &ui.btnLogin, Text: "登 录", MinSize: Size{Width: 120}, OnClicked: func() { ui.onLogin() }},
-	)
+	// 登录按钮独立成行并水平居中（HSpacer 两端夹持）
+	loginBtnRow := Composite{
+		ColumnSpan: 2,
+		Layout:     HBox{Margins: Margins{}, Spacing: 0},
+		Children: []Widget{
+			HSpacer{},
+			PushButton{AssignTo: &ui.btnLogin, Text: "登  录", MinSize: Size{Width: 160, Height: 32}, OnClicked: func() { ui.onLogin() }},
+			HSpacer{},
+		},
+	}
+	formChildren = append(formChildren, Label{Text: ""}, loginBtnRow)
 
 	mainWindow := MainWindow{
 		AssignTo: &ui.mw,
 		Title:    siWndTitle,
 		Icon:     appIcon,
+		Font:     Font{Family: "微软雅黑", PointSize: 10},
 		MinSize:  Size{Width: 520, Height: 600},
 		Size:     Size{Width: 560, Height: 680},
 		Visible:  !bootAutostart, // 开机自启拉起：窗口不显示，仅托盘
 		Layout:   VBox{Margins: Margins{Left: 14, Top: 12, Right: 14, Bottom: 12}, Spacing: 10},
 		Children: []Widget{
-			// ---------- 登录页 ----------
+			// ---------- 登录页：上下 VSpacer 夹持表单，任何窗口高度下表单垂直居中 ----------
 			Composite{
-				AssignTo: &ui.loginPage,
-				Layout:   Grid{Columns: 2, Spacing: 10, Margins: Margins{}},
-				Children: loginChildren,
-			},
-			// ---------- 工作页 ----------
-			Composite{
-				AssignTo: &ui.workPage,
-				Visible:  false,
-				Layout:   VBox{Margins: Margins{}, Spacing: 8},
+				AssignTo:      &ui.loginPage,
+				StretchFactor: 1,
+				Layout:        VBox{Margins: Margins{Left: 24, Top: 8, Right: 24, Bottom: 8}, Spacing: 12},
 				Children: []Widget{
+					VSpacer{StretchFactor: 2},
+					Composite{
+						Layout: Grid{Columns: 2, Spacing: 12, Margins: Margins{}},
+						Children: append(append([]Widget{}, formChildren[:len(formChildren)-2]...),
+							Label{Text: ""}, loginBtnRow),
+					},
+					VSpacer{StretchFactor: 3},
+				},
+			},
+			// ---------- 工作页：弹性空间只分给映射区(5)和日志区(3)，其余行保持固有高度 ----------
+			Composite{
+				AssignTo:      &ui.workPage,
+				Visible:       false,
+				StretchFactor: 1,
+				Layout:        VBox{Margins: Margins{}, Spacing: 8},
+				Children: []Widget{
+					// 状态行：状态文字 + 右侧注销按钮
 					Composite{
 						Layout: HBox{Margins: Margins{}, Spacing: 8},
 						Children: []Widget{
-							Label{AssignTo: &ui.lblStatus, Text: "状态：未连接", StretchFactor: 1},
-							PushButton{AssignTo: &ui.btnLogout, Text: "注销", OnClicked: func() { ui.onLogout() }},
+							Label{AssignTo: &ui.lblStatus, Text: "状态：未连接", StretchFactor: 1,
+								TextColor: walk.RGB(31, 78, 121)},
+							PushButton{AssignTo: &ui.btnLogout, Text: "注销", MinSize: Size{Width: 88},
+								OnClicked: func() { ui.onLogout() }},
 						},
 					},
 					// 客户端：端口映射
@@ -175,26 +196,36 @@ func runUI(a *App) error {
 						Layout:        VBox{Margins: Margins{}, Spacing: 6},
 						StretchFactor: 5,
 						Children: []Widget{
+							// 末列吃掉表格剩余宽度；表格纵向吃掉映射区多余高度
 							TableView{
-								AssignTo: &ui.table,
+								AssignTo:            &ui.table,
+								StretchFactor:       1,
+								LastColumnStretched: true,
 								Columns: []TableViewColumn{
-									{Title: "目标主机", Width: 150},
-									{Title: "远端端口", Width: 80},
-									{Title: "本地监听", Width: 110},
+									{Title: "目标主机", Width: 160},
+									{Title: "远端端口", Width: 90},
+									{Title: "本地监听"},
 								},
 								Model: ui.mm,
 							},
+							// 标签与输入框成对排列（Grid 6 列恰好一行），杜绝错行
 							Composite{
-								Layout: Grid{Columns: 5, Spacing: 6, Margins: Margins{}},
+								Layout: Grid{Columns: 6, Spacing: 6, Margins: Margins{}},
 								Children: []Widget{
 									Label{Text: "目标主机"},
-									Label{Text: "远端端口"},
-									Label{Text: "本地端口"},
 									LineEdit{AssignTo: &ui.edRuleHost, CueBanner: "留空=服务器本机"},
+									Label{Text: "远端端口"},
 									LineEdit{AssignTo: &ui.edRuleRemote, CueBanner: "如 9123"},
+									Label{Text: "本地端口"},
 									LineEdit{AssignTo: &ui.edRuleLocal, CueBanner: "如 18080"},
-									PushButton{Text: "添加", OnClicked: func() { ui.onAddRule() }},
-									PushButton{Text: "删除选中", OnClicked: func() { ui.onDelRule() }},
+								},
+							},
+							Composite{
+								Layout: HBox{Margins: Margins{}, Spacing: 6},
+								Children: []Widget{
+									PushButton{Text: "添加", MinSize: Size{Width: 88}, OnClicked: func() { ui.onAddRule() }},
+									PushButton{Text: "删除选中", MinSize: Size{Width: 88}, OnClicked: func() { ui.onDelRule() }},
+									HSpacer{},
 								},
 							},
 						},
@@ -212,8 +243,8 @@ func runUI(a *App) error {
 								Children: []Widget{
 									Label{Text: "允许访问的内网主机（本机 127.0.0.1 默认已允许）", ColumnSpan: 3},
 									LineEdit{AssignTo: &ui.edHost, CueBanner: "如 192.168.5.20 或 NAS 主机名"},
-									PushButton{Text: "添加", OnClicked: func() { ui.onAddHost() }},
-									PushButton{Text: "删除选中", OnClicked: func() { ui.onDelHost() }},
+									PushButton{Text: "添加", MinSize: Size{Width: 88}, OnClicked: func() { ui.onAddHost() }},
+									PushButton{Text: "删除选中", MinSize: Size{Width: 88}, OnClicked: func() { ui.onDelHost() }},
 								},
 							},
 						},
@@ -225,16 +256,23 @@ func runUI(a *App) error {
 						Font:      Font{PointSize: 12},
 						OnClicked: func() { go ui.app.toggleConnection() },
 					},
-					CheckBox{
-						AssignTo: &ui.chkAuto,
-						Text:     "开机自动启动并连接",
-						OnClicked: func() {
-							on := ui.chkAuto.Checked()
-							go func() {
-								if err := ui.app.SetAutoStart(on); err != nil {
-									ui.app.logf("warn", "开机自启设置失败：%v", err)
-								}
-							}()
+					// 自启开关靠左（右侧 HSpacer 防止被居中/拉伸）
+					Composite{
+						Layout: HBox{Margins: Margins{}},
+						Children: []Widget{
+							CheckBox{
+								AssignTo: &ui.chkAuto,
+								Text:     "开机自动启动并连接",
+								OnClicked: func() {
+									on := ui.chkAuto.Checked()
+									go func() {
+										if err := ui.app.SetAutoStart(on); err != nil {
+											ui.app.logf("warn", "开机自启设置失败：%v", err)
+										}
+									}()
+								},
+							},
+							HSpacer{},
 						},
 					},
 					TextEdit{
