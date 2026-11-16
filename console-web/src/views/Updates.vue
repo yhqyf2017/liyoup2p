@@ -49,7 +49,7 @@
           </el-form-item>
         </div>
         <el-form-item label="更新说明">
-          <el-input v-model="form.notes" type="textarea" :rows="3" placeholder="面向用户展示的更新内容说明" />
+          <el-input v-model="form.notes" type="textarea" :rows="3" placeholder="写给最终用户看的一句话说明（如「修复登录偶尔失败」「新增检查更新按钮」），不要写网址、端口、校验值等技术细节" />
         </el-form-item>
         <el-form-item label="安装包" required>
           <el-upload

@@ -39,6 +39,83 @@ class LogEntry {
   LogEntry({required this.level, required this.text});
 }
 
+/// 纯内部日志：对用户没有意义，直接丢弃。
+const List<String> _logNoise = [
+  '管理通道已就绪',
+  '管理通道启动失败',
+  '演示页已启动',
+  'STUN 公网探测',
+  '打洞目标已就绪',
+  '更换套接字',
+  '等待对端候选',
+];
+
+final RegExp _logTimePrefix = RegExp(r'^\[\d{2}:\d{2}:\d{2}\]\s*(\[[^\]]*\]\s*)?');
+final RegExp _urlRe = RegExp(r'(https?|wss?)://\S+');
+final RegExp _tokenRe = RegExp(r'[（(]?\btoken=\S*?[）)]?');
+final RegExp _spaceRe = RegExp(r'[ \t]{2,}');
+
+/// 一条技术日志 → 用户语言的改写规则（与桌面端 gui-walk/gui-wails 的 userlog.go 对齐）。
+class _LogRule {
+  final RegExp re;
+  final String Function(Match) repl;
+  const _LogRule(this.re, this.repl);
+}
+
+final List<_LogRule> _logRules = [
+  _LogRule(RegExp(r'已连接(平台)?信令通道.*'), (_) => '已连接到服务器'),
+  _LogRule(RegExp(r'信令通道就绪.*'), (_) => '已连接到服务器，服务已就绪'),
+  _LogRule(RegExp(r'信令连接断开.*'), (_) => '与服务器的连接中断，正在自动重连…'),
+  _LogRule(RegExp(r'连接平台失败.*'), (_) => '暂时无法连接服务器，正在重试…'),
+  _LogRule(
+    RegExp(r'映射 (\S+) 已监听 \S+：本机访问 \S+ 即达服务端内网主机 (\S+) 的端口 (\d+)'),
+    (m) => '已开通：本机端口 ${m[1]} ↔ 服务器内网主机 ${m[2]} 的 ${m[3]} 端口',
+  ),
+  _LogRule(
+    RegExp(r'映射 (\S+) 已监听 \S+：本机访问 \S+ 即达服务端端口 (\d+)'),
+    (m) => '已开通：本机端口 ${m[1]} ↔ 服务器 ${m[2]} 端口',
+  ),
+  _LogRule(RegExp(r'映射 (\S+) 已监听.*'), (m) => '已开通：本机端口 ${m[1]}'),
+  _LogRule(RegExp(r'映射 (\S+) 已停止监听.*'), (m) => '已断开：本机端口 ${m[1]}'),
+  _LogRule(
+    RegExp(r'映射 (\S+) 入口 \S+ 监听异常.*'),
+    (m) => '本机端口 ${m[1]} 无法继续使用（可能已被其他程序占用），可删除后重新添加',
+  ),
+  _LogRule(RegExp(r'对端不支持多路复用.*'), (_) => '对方版本较旧，已自动使用兼容方式连接'),
+  _LogRule(RegExp(r'直连升级第 \d+ 次尝试未获.*'), (_) => '正在优化连接线路，稍后自动重试'),
+  _LogRule(RegExp(r'请求未得到响应.*'), (_) => '请求超时，请确认服务器与对端设备在线'),
+  _LogRule(RegExp(r'目标主机未被服务器允许.*'), (_) => '服务器未允许访问该内网主机，请联系管理员'),
+  _LogRule(RegExp(r'连接中继失败.*'), (_) => '线路切换中，正在尝试其他路径…'),
+  _LogRule(RegExp(r'回退中继模式.*'), (_) => '已切换到中转线路'),
+  _LogRule(RegExp(r'打洞成功.*'), (_) => '已建立直连'),
+  _LogRule(RegExp(r'^会话 \S+[：:]\s*'), (_) => ''),
+];
+
+/// 把底层连接程序的一行日志转成面向用户的文字；返回 null 表示该行应丢弃。
+String? userizeLog(String line) {
+  var s = line.trim();
+  if (s.isEmpty) return null;
+  for (final noise in _logNoise) {
+    if (s.contains(noise)) return null;
+  }
+  s = s.replaceFirst(_logTimePrefix, '');
+  for (final r in _logRules) {
+    if (r.re.hasMatch(s)) {
+      s = s.replaceAllMapped(r.re, r.repl);
+      break;
+    }
+  }
+  s = s.replaceAll(_urlRe, '服务器');
+  s = s.replaceAll(_tokenRe, '');
+  s = s.replaceAll('Agent', '连接程序');
+  s = s.replaceAll('WebSocket', '网络连接');
+  s = s.replaceAll('sha256', '完整性校验');
+  s = s.replaceAll(_spaceRe, ' ').trim();
+  s = s.replaceAll(RegExp(r'^[：:，,\s]+|[：:，,\s]+$'), '');
+  return s.isEmpty ? null : s;
+}
+
+
 /// Go Agent 桥接：MethodChannel 调用 + EventChannel 日志流。
 class P2PBridge {
   static const _method = MethodChannel('liyou.p2p/agent');
@@ -107,13 +184,17 @@ class P2PBridge {
   Future<void> moveToBack() => _method.invokeMethod('moveToBack');
 
   /// 日志流（Go 回调 → Android 主线程 → Dart 广播流）。
+  /// 底层日志含大量技术细节：先翻译成用户语言（内部行直接丢弃），再脱敏平台地址。
   Stream<LogEntry> logs() {
-    return _logStream ??= _logs.receiveBroadcastStream().map(
-      (e) => LogEntry(
-        level: (e as Map)['level'] as String? ?? 'info',
-        text: sanitizeServerText((e)['text'] as String? ?? ''),
-      ),
-    );
+    return _logStream ??= _logs.receiveBroadcastStream().map((e) {
+      final raw = (e as Map)['text'] as String? ?? '';
+      final text = userizeLog(raw);
+      if (text == null) return null;
+      return LogEntry(
+        level: (e)['level'] as String? ?? 'info',
+        text: sanitizeServerText(text),
+      );
+    }).where((e) => e != null).cast<LogEntry>();
   }
 }
 

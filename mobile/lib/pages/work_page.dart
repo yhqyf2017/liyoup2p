@@ -115,14 +115,13 @@ class _WorkPageState extends State<WorkPage> {
     };
     void log(String level, String text) =>
         _logs.add(LogEntry(level: level, text: text));
-    log('info', '[信令] 已连接平台 jyly8888.gnway.vip:58894');
-    log('info', '[打洞] 192.168.5.20:80 → UDP 打洞成功（直连）');
-    log('info', '[映射] 入口 127.0.0.1:18080 监听中');
-    log('info', '[打洞] 3306 → UDP 打洞成功（直连）');
-    log('info', '[映射] 入口 127.0.0.1:13306 监听中');
-    log('warn', '[打洞] 445 → 打洞失败，回退中继模式…');
-    log('info', '[中继] 445 → 中继通道建立成功');
-    log('error', '[重连] 信令断开一次，已自动恢复');
+    log('info', '已连接到服务器');
+    log('info', '已建立直连，线路质量良好');
+    log('info', '已开通：本机端口 18080 ↔ 服务器 80 端口');
+    log('info', '已开通：本机端口 13306 ↔ 服务器 3306 端口');
+    log('warn', '本机端口 14445 暂时无法直连，已切换到中转线路');
+    log('info', '已建立中转连接');
+    log('error', '与服务器的连接中断，正在自动恢复…');
   }
 
   @override
@@ -197,7 +196,7 @@ class _WorkPageState extends State<WorkPage> {
       setState(() {
         _status = {..._status, 'running': true, 'wsConnected': true};
       });
-      _logs.add(LogEntry(level: 'info', text: '[Agent] 客户端已启动'));
+      _logs.add(LogEntry(level: 'info', text: '已连接到服务器'));
       return;
     }
     setState(() => _busy = true);
@@ -226,7 +225,7 @@ class _WorkPageState extends State<WorkPage> {
       setState(() {
         _status = {..._status, 'running': false, 'wsConnected': false};
       });
-      _logs.add(LogEntry(level: 'info', text: '[Agent] 客户端已停止'));
+      _logs.add(LogEntry(level: 'info', text: '已断开连接'));
       return;
     }
     setState(() => _busy = true);
@@ -597,7 +596,7 @@ class _StatusCard extends StatelessWidget {
                       ),
                       const SizedBox(width: T.s4),
                       Text(
-                        wsOK ? '信令就绪' : '握手中',
+                        wsOK ? '已就绪' : '连接中',
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,

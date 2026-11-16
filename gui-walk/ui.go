@@ -336,7 +336,7 @@ func runUI(a *App) error {
 									on := ui.chkAuto.Checked()
 									go func() {
 										if err := ui.app.SetAutoStart(on); err != nil {
-											ui.app.logf("warn", "开机自启设置失败：%v", err)
+											ui.app.logf("warn", "开机自启设置失败，请稍后重试")
 										}
 									}()
 								},
@@ -529,8 +529,8 @@ func (ui *uiState) onLogin() {
 		ui.mw.Synchronize(func() {
 			ui.btnLogin.SetEnabled(true)
 			if err != nil {
-				a.logf("error", "登录失败：%v", err)
-				walk.MsgBox(ui.mw, "登录失败", err.Error(), walk.MsgBoxIconError)
+				a.logf("error", "登录失败：%s", userErr(err))
+				walk.MsgBox(ui.mw, "登录失败", userErr(err), walk.MsgBoxIconError)
 				return
 			}
 			ui.enterWorkPage()
@@ -545,7 +545,7 @@ func (ui *uiState) onAddRule() {
 	remoteStr := strings.TrimSpace(ui.edRuleRemote.Text())
 	remote, err := strconv.Atoi(remoteStr)
 	if err != nil {
-		ui.app.logf("error", "远端端口须为数字（1-65535）")
+		ui.app.logf("error", "请输入 1-65535 之间的端口号")
 		return
 	}
 	a := ui.app

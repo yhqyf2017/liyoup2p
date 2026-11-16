@@ -147,7 +147,7 @@ func (a *App) clearKickedSession() {
 	a.mu.Lock()
 	a.session = nil
 	a.mu.Unlock()
-	a.logf("warn", "账号已在其他电脑登录，本机会话已被顶替并清除")
+	a.logf("warn", "账号已在其他电脑登录，本机已自动断开")
 }
 
 // App Wails 绑定对象。
@@ -190,7 +190,7 @@ func (a *App) startup(ctx context.Context) {
 	startTray(a)            // 托盘常驻（图标 + 菜单 + 气泡）
 	// 开机自启：默认开启，按用户偏好同步注册表（每次启动刷新 exe 路径）
 	if err := ensureAutostart(); err != nil {
-		a.logf("warn", "开机自启注册失败：%v", err)
+		a.logf("warn", "开机自启设置失败，请稍后重试")
 	}
 	// 开机自启拉起（--autostart）：隐藏到托盘并自动恢复连接
 	if bootAutostart {
@@ -213,7 +213,7 @@ func (a *App) beforeClose(ctx context.Context) bool {
 		a.mu.Unlock()
 		if s != nil {
 			if err := a.saveSession(s); err != nil {
-				a.logf("warn", "退出前保存配置失败：%v", err)
+				a.logf("warn", "配置保存失败，请稍后重试")
 			}
 		}
 		return false
@@ -332,7 +332,7 @@ func (a *App) toggleConnection() {
 		return
 	}
 	if err := a.StartAgent(s.DeviceRole, s.Mappings, s.Hosts, "", s.PlatformWS); err != nil {
-		a.logf("error", "启动连接失败：%v", err)
+		a.logf("error", "启动连接失败：%s", userErr(err))
 		a.showMainWindow() // 前台展示失败原因（错误已进日志面板）
 	}
 }
@@ -583,7 +583,7 @@ func (a *App) Login(platformURL, tenant, user, pass, devName, role string, mappi
 		return nil, errors.New("请先选择设备角色")
 	}
 
-	a.logf("info", "正在登录平台 %s（账号 %s）…", base, user)
+	a.logf("info", "正在登录服务器（账号 %s）…", user)
 	env, err := postJSON(base+"/api/auth/login", map[string]any{
 		"username": user, "password": pass, "tenant": tenant, "client_type": "pc",
 	}, "")
@@ -602,9 +602,9 @@ func (a *App) Login(platformURL, tenant, user, pass, devName, role string, mappi
 		User        UserInfo `json:"user"`
 	}
 	if err := json.Unmarshal(env.Data, &loginData); err != nil {
-		return nil, fmt.Errorf("登录响应解析失败：%w", err)
+		return nil, errors.New("登录未完成，请稍后重试")
 	}
-	a.logf("info", "登录成功：用户 %s（角色 %s，租户 %s）", loginData.User.Username, loginData.User.Role, loginData.User.Tenant)
+	a.logf("info", "登录成功：%s", loginData.User.Username)
 
 	if strings.TrimSpace(devName) == "" {
 		host, _ := os.Hostname()
@@ -621,7 +621,7 @@ func (a *App) Login(platformURL, tenant, user, pass, devName, role string, mappi
 		reuseUID = s.DeviceUID
 	}
 	a.mu.Unlock()
-	a.logf("info", "正在注册设备「%s」（%s）…", devName, role)
+	a.logf("info", "正在登记本机设备「%s」…", devName)
 	env, err = postJSON(base+"/api/devices/register", map[string]any{
 		"name": devName, "role": role, "tenant_id": loginData.User.TenantID,
 		"device_uid": reuseUID,
@@ -643,9 +643,9 @@ func (a *App) Login(platformURL, tenant, user, pass, devName, role string, mappi
 		DeviceToken string `json:"device_token"`
 	}
 	if err := json.Unmarshal(env.Data, &devData); err != nil {
-		return nil, fmt.Errorf("设备注册响应解析失败：%w", err)
+		return nil, errors.New("设备登记未完成，请稍后重试")
 	}
-	a.logf("info", "设备注册成功：UID %s，已签发 30 天设备令牌", devData.DeviceUID)
+	a.logf("info", "本机设备登记成功")
 
 	cleanMaps := make([]MapRule, 0, len(mappings))
 	for _, m := range mappings {
@@ -653,7 +653,7 @@ func (a *App) Login(platformURL, tenant, user, pass, devName, role string, mappi
 			r := MapRule{Remote: m.Remote, Local: strings.TrimSpace(m.Local)}
 			if h := strings.TrimSpace(m.Host); h != "" {
 				if err := validateHostInput(h); err != nil {
-					return nil, fmt.Errorf("映射目标主机 %q：%v", h, err)
+					return nil, fmt.Errorf("目标主机 %s：%v", h, err)
 				}
 				r.Host = h
 			}
@@ -672,12 +672,12 @@ func (a *App) Login(platformURL, tenant, user, pass, devName, role string, mappi
 		Mappings:    cleanMaps,
 	}
 	if err := a.saveSession(s); err != nil {
-		a.logf("warn", "会话保存失败：%v", err)
+		a.logf("warn", "登录信息保存失败，请稍后重试")
 	}
 	a.mu.Lock()
 	a.session = s
 	a.mu.Unlock()
-	a.logf("info", "登录完成，设备 %s 已就绪", s.DeviceUID)
+	a.logf("info", "登录完成，可以开始连接了")
 
 	res := &LoginResult{
 		PlatformURL: s.PlatformURL,
@@ -701,7 +701,7 @@ func (a *App) Login(platformURL, tenant, user, pass, devName, role string, mappi
 func agentExe() (string, error) {
 	if p := strings.TrimSpace(os.Getenv("LIYOU_AGENT_EXE")); p != "" {
 		if _, err := os.Stat(p); err != nil {
-			return "", errors.New("未找到 Agent 程序 " + p)
+			return "", errors.New("程序文件不完整，请重新安装")
 		}
 		return p, nil
 	}
@@ -711,7 +711,7 @@ func agentExe() (string, error) {
 	}
 	p := filepath.Join(filepath.Dir(exe), "liyou-agent.exe")
 	if _, err := os.Stat(p); err != nil {
-		return "", errors.New("未找到 Agent 程序 " + p)
+		return "", errors.New("程序文件不完整，请重新安装")
 	}
 	return p, nil
 }
@@ -730,7 +730,7 @@ func (a *App) StartAgent(role string, mappings []MapRule, hosts []string, device
 	a.mu.Lock()
 	if a.running {
 		a.mu.Unlock()
-		return errors.New("Agent 已在运行，请先停止")
+		return errors.New("连接已在使用中，请先断开")
 	}
 	s := a.session
 	a.mu.Unlock()
@@ -739,13 +739,13 @@ func (a *App) StartAgent(role string, mappings []MapRule, hosts []string, device
 		deviceToken = s.DeviceToken
 	}
 	if deviceToken == "" {
-		return errors.New("缺少设备令牌，请重新登录")
+		return errors.New("登录信息已失效，请重新登录")
 	}
 	if platformWS == "" && s != nil {
 		platformWS = s.PlatformWS
 	}
 	if platformWS == "" {
-		return errors.New("缺少平台信令地址，请重新登录")
+		return errors.New("登录信息已失效，请重新登录")
 	}
 	if releaseMode() {
 		platformWS = wsURL(defaultPlatformURL) // 正式包信令固定内置平台地址
@@ -774,7 +774,7 @@ func (a *App) StartAgent(role string, mappings []MapRule, hosts []string, device
 				spec := fmt.Sprintf("%d:%s", m.Remote, strings.TrimSpace(m.Local))
 				if h := strings.TrimSpace(m.Host); h != "" {
 					if err := validateHostInput(h); err != nil {
-						return fmt.Errorf("映射目标主机 %q：%v", h, err)
+						return fmt.Errorf("目标主机 %s：%v", h, err)
 					}
 					spec = fmt.Sprintf("%s:%d:%s", h, m.Remote, strings.TrimSpace(m.Local))
 				}
@@ -831,11 +831,11 @@ func (a *App) StartAgent(role string, mappings []MapRule, hosts []string, device
 	cmd.Stderr = pw // 合并 stderr 到同一管道
 	hideWindow(cmd)
 
-	a.logf("info", "正在启动 Agent（角色=%s）…", role)
+	a.logf("info", "正在建立连接…")
 	if err := cmd.Start(); err != nil {
 		pw.Close()
 		pr.Close()
-		return fmt.Errorf("Agent 启动失败：%w", err)
+		return fmt.Errorf("启动连接失败：%s", friendlyErr(err.Error()))
 	}
 	pw.Close() // 父进程侧写端关闭，子进程退出后读端自然 EOF
 	a.mu.Lock()
@@ -852,14 +852,14 @@ func (a *App) StartAgent(role string, mappings []MapRule, hosts []string, device
 		a.mu.Lock()
 		s.Mappings = mappings
 		if err := a.saveSession(s); err != nil {
-			a.logf("warn", "映射配置保存失败：%v", err)
+			a.logf("warn", "配置保存失败，请稍后重试")
 		}
 		a.mu.Unlock()
 	} else if role == "server" && s != nil && serverHosts != nil {
 		a.mu.Lock()
 		s.Hosts = serverHosts
 		if err := a.saveSession(s); err != nil {
-			a.logf("warn", "内网主机配置保存失败：%v", err)
+			a.logf("warn", "配置保存失败，请稍后重试")
 		}
 		a.mu.Unlock()
 	}
@@ -878,9 +878,9 @@ func (a *App) StartAgent(role string, mappings []MapRule, hosts []string, device
 		a.emitAgentState(false) // 主窗口按钮同步
 		if !stopping {
 			if waitErr != nil {
-				a.logf("error", "Agent 进程异常退出：%v", waitErr)
+				a.logf("error", "连接意外中断，请重新连接")
 			} else {
-				a.logf("info", "Agent 进程已退出")
+				a.logf("info", "连接已断开")
 			}
 		}
 	}()
@@ -920,7 +920,11 @@ func (a *App) pumpLogs(r io.Reader) {
 		} else if strings.Contains(line, "[警告]") || strings.Contains(line, "[Warn]") {
 			level = "warn"
 		}
-		a.logf(level, "%s", line)
+		text, ok := userizeAgentLine(line)
+		if !ok {
+			continue // 内部细节不进用户日志面板
+		}
+		a.logf(level, "%s", text)
 	}
 }
 
@@ -937,10 +941,10 @@ func (a *App) StopAgent() {
 	traySetRunning(false)   // 托盘菜单/提示同步为「启动连接」
 	a.emitAgentState(false) // 主窗口按钮同步
 	if cmd != nil && cmd.Process != nil {
-		a.logf("info", "正在停止 Agent…")
+		a.logf("info", "正在断开连接…")
 		_ = cmd.Process.Kill() // 退出回收由 Wait goroutine 完成
 	} else if wasRunning {
-		a.logf("info", "Agent 已停止")
+		a.logf("info", "已断开连接")
 	}
 }
 
@@ -950,7 +954,7 @@ func (a *App) OpenPage(localPort int) error {
 		return errors.New("端口非法")
 	}
 	url := fmt.Sprintf("http://127.0.0.1:%d", localPort)
-	a.logf("info", "正在打开 %s", url)
+	a.logf("info", "正在打开本机页面…")
 	return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
 }
 
@@ -1026,7 +1030,7 @@ func (a *App) AddMapping(host string, remote int, local string) (*MappingOpResul
 
 	if running {
 		if addr == "" {
-			return nil, errors.New("Agent 管理通道未就绪，请停止后重新启动连接")
+			return nil, errors.New("连接尚未就绪，请断开后重新连接")
 		}
 		// Agent 侧负责查重与端口占用校验（重复/冲突会返回明确错误）
 		if _, err := adminCall(http.MethodPost, addr, tok, "/maps", map[string]any{
@@ -1053,9 +1057,9 @@ func (a *App) AddMapping(host string, remote int, local string) (*MappingOpResul
 		return append(list, rule)
 	})
 	if running {
-		a.logf("info", "映射 %s 已即时生效（连接保持不断开）", mapDesc(rule.Host, rule.Remote, rule.Local))
+		a.logf("info", "已开通：%s（当前连接不中断）", mapDesc(rule.Host, rule.Remote, rule.Local))
 	} else {
-		a.logf("info", "映射 %s 已保存，启动连接后生效", mapDesc(rule.Host, rule.Remote, rule.Local))
+		a.logf("info", "已保存：%s（连接后生效）", mapDesc(rule.Host, rule.Remote, rule.Local))
 	}
 	return &MappingOpResult{Applied: running, Rule: rule}, nil
 }
@@ -1090,7 +1094,7 @@ func (a *App) RemoveMapping(host string, remote int, local string) (*MappingOpRe
 				return nil, err
 			}
 			applied = true
-			a.logf("info", "映射 %s 已停止监听", mapDesc(rule.Host, rule.Remote, rule.Local))
+			a.logf("info", "已断开：%s", mapDesc(rule.Host, rule.Remote, rule.Local))
 		}
 	}
 	a.updateMappings(func(list []MapRule) []MapRule {
@@ -1118,7 +1122,7 @@ func (a *App) updateMappings(fn func([]MapRule) []MapRule) {
 	err := a.saveSession(s)
 	a.mu.Unlock()
 	if err != nil {
-		a.logf("warn", "映射配置保存失败：%v", err)
+		a.logf("warn", "配置保存失败，请稍后重试")
 	}
 	a.saveRulesHint(s.Mappings, s.Hosts) // 规则记忆镜像：注销后保留
 }
@@ -1141,7 +1145,7 @@ func adminMaps(addr, token string) ([]adminMapItem, error) {
 	}
 	var list []adminMapItem
 	if err := json.Unmarshal(data, &list); err != nil {
-		return nil, fmt.Errorf("映射列表解析失败：%w", err)
+		return nil, errors.New("连接信息异常，请重新连接")
 	}
 	return list, nil
 }
@@ -1254,7 +1258,7 @@ func (a *App) AddHost(host string) (*HostOpResult, error) {
 
 	if running {
 		if addr == "" {
-			return nil, errors.New("Agent 管理通道未就绪，请停止后重新启动连接")
+			return nil, errors.New("连接尚未就绪，请断开后重新连接")
 		}
 		if _, err := adminCall(http.MethodPost, addr, tok, "/hosts", map[string]any{"host": host}); err != nil {
 			return nil, err
@@ -1294,7 +1298,7 @@ func (a *App) RemoveHost(host string) (*HostOpResult, error) {
 	applied := false
 	if running {
 		if addr == "" {
-			return nil, errors.New("Agent 管理通道未就绪，请停止后重新启动连接")
+			return nil, errors.New("连接尚未就绪，请断开后重新连接")
 		}
 		if _, err := adminCall(http.MethodDelete, addr, tok, "/hosts/"+url.PathEscape(host), nil); err != nil {
 			return nil, err

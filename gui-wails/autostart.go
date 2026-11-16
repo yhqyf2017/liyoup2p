@@ -146,7 +146,7 @@ func (a *App) autostartBoot() {
 		return
 	}
 	if err := a.StartAgent(s.DeviceRole, s.Mappings, s.Hosts, s.DeviceToken, s.PlatformWS); err != nil {
-		a.logf("warn", "开机自启：自动连接失败：%v", err)
+		a.logf("warn", "开机自动连接未成功：%s", userErr(err))
 	} else {
 		a.logf("info", "开机自启：已自动恢复连接")
 	}

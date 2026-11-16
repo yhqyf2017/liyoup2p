@@ -89,15 +89,15 @@ func (a *App) updateLoop() {
 func (a *App) autoUpdate() bool {
 	info, err := a.fetchLatest()
 	if err != nil {
-		a.logf("warn", "检查更新失败：%v", sanitizeServerText(err.Error()))
+		a.logf("warn", "暂时无法检查更新：%s", friendlyErr(err.Error()))
 		return false
 	}
 	if info.Version == "" || !versionNewer(appVersion, info.Version) {
 		return true
 	}
-	a.logf("info", "发现新版本 %s（当前 %s），正在后台下载…", info.Version, appVersion)
+	a.logf("info", "发现新版本 %s，正在后台下载…", info.Version)
 	if err := a.downloadAndInstall(info); err != nil {
-		a.logf("error", "自动更新失败：%v", err)
+		a.logf("error", "自动更新未完成：%s", err.Error())
 	}
 	return true
 }
@@ -155,7 +155,7 @@ func (a *App) downloadAndInstall(info *latestInfo) error {
 
 	url := info.URL
 	if url == "" {
-		return errors.New("服务器未返回下载地址")
+		return errors.New("更新信息不完整，请稍后重试")
 	}
 	if strings.HasPrefix(url, "/") {
 		url = a.updateBaseURL() + url
@@ -167,42 +167,42 @@ func (a *App) downloadAndInstall(info *latestInfo) error {
 	client := &http.Client{Timeout: 30 * time.Minute}
 	resp, err := client.Get(url)
 	if err != nil {
-		return fmt.Errorf("下载失败：%s", sanitizeServerText(err.Error()))
+		return fmt.Errorf("下载失败：%s", friendlyErr(err.Error()))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("下载失败：HTTP %d", resp.StatusCode)
+		return errors.New("下载失败，请稍后重试")
 	}
 	f, err := os.Create(part)
 	if err != nil {
-		return fmt.Errorf("创建临时文件失败：%w", err)
+		return errors.New("更新准备失败，请检查磁盘空间后重试")
 	}
 	hasher := sha256.New()
 	_, err = io.Copy(io.MultiWriter(f, hasher), resp.Body)
 	f.Close()
 	if err != nil {
 		_ = os.Remove(part)
-		return fmt.Errorf("下载中断：%w", err)
+		return errors.New("下载中断，请检查网络后重试")
 	}
 	if info.SHA256 != "" {
 		got := hex.EncodeToString(hasher.Sum(nil))
 		if !strings.EqualFold(got, info.SHA256) {
 			_ = os.Remove(part)
-			return fmt.Errorf("校验失败：sha256 不匹配（期望 %s，实际 %s）", info.SHA256[:12], got[:12])
+			return errors.New("安装包校验未通过，请稍后重试")
 		}
 	}
 	if err := os.Rename(part, dst); err != nil {
 		_ = os.Remove(part)
-		return fmt.Errorf("落盘安装包失败：%w", err)
+		return errors.New("保存安装包失败，请检查磁盘空间")
 	}
 
-	a.logf("info", "新版本 %s 下载完成，正在静默安装…", info.Version)
+	a.logf("info", "新版本已下载完成，正在自动安装…")
 
 	// 静默安装：装完由 Inno 重启本程序（/RESTARTAPPLICATIONS 配合 /CLOSEAPPLICATIONS）
 	cmd := exec.Command(dst, "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
 		"/CLOSEAPPLICATIONS", "/RESTARTAPPLICATIONS")
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("启动安装器失败：%w", err)
+		return errors.New("自动安装未能启动，请重新下载安装包手动安装")
 	}
 	// 让安装器先起来，再退出自身（文件被占用时 Inno 会等待/关闭本进程）
 	go func() {
@@ -229,9 +229,9 @@ func (ui *uiState) CheckUpdateManual() {
 	info, err := a.fetchLatest()
 	switch {
 	case err != nil:
-		ui.notifyUpdate("检查更新失败：" + sanitizeServerText(err.Error()))
+		ui.notifyUpdate("暂时无法检查更新：" + friendlyErr(err.Error()))
 	case info.Version == "":
-		ui.notifyUpdate("服务器暂未发布 Win7 版本，当前已是最新")
+		ui.notifyUpdate("当前已是最新版本")
 	case !versionNewer(appVersion, info.Version):
 		ui.notifyUpdate(fmt.Sprintf("当前已是最新版本 %s", appVersion))
 	default:
@@ -244,8 +244,8 @@ func (ui *uiState) CheckUpdateManual() {
 		}
 		ui.notifyUpdate(fmt.Sprintf("发现新版本 %s，正在下载安装…", info.Version))
 		if err := a.downloadAndInstall(info); err != nil {
-			a.logf("error", "更新失败：%v", err)
-			ui.notifyUpdate("更新失败：" + err.Error())
+			a.logf("error", "更新未完成：%s", err.Error())
+			ui.notifyUpdate("更新未完成：" + err.Error())
 		}
 	}
 }

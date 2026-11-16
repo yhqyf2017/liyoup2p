@@ -146,7 +146,7 @@ func (a *App) CheckUpdate() (*UpdateInfo, error) {
 func (a *App) trayCheckUpdate() {
 	info, err := a.CheckUpdate()
 	if err != nil {
-		a.logf("error", "检查更新失败：%v", err)
+		a.logf("error", "暂时无法检查更新：%s", friendlyErr(err.Error()))
 		a.showMainWindow()
 		return
 	}
@@ -166,7 +166,7 @@ func (a *App) trayCheckUpdate() {
 func (a *App) autoCheckUpdate() {
 	info, err := a.CheckUpdate()
 	if err != nil {
-		a.logf("error", "检查更新失败：%v", err)
+		a.logf("error", "暂时无法检查更新：%s", friendlyErr(err.Error()))
 		updateFileLogf("check error: %v", err)
 		a.showMainWindow()
 		return
@@ -180,7 +180,7 @@ func (a *App) autoCheckUpdate() {
 	a.showMainWindow()
 	a.logf("info", "发现新版本 v%s：%s", info.Version, info.Notes)
 	if err := a.ApplyUpdate(); err != nil {
-		a.logf("error", "自动升级失败：%v", err)
+		a.logf("error", "升级未完成：%s", userErr(err))
 		updateFileLogf("auto apply failed: %v", err)
 	}
 }
@@ -193,7 +193,7 @@ func (a *App) ApplyUpdate() error {
 		return err
 	}
 	if li.Version == "" {
-		return errors.New("平台暂未提供更新包")
+		return errors.New("暂无可用更新")
 	}
 	if !semverGreater(appVersion, li.Version) {
 		a.logf("info", "当前已是最新版本（v%s）", appVersion)
@@ -201,19 +201,19 @@ func (a *App) ApplyUpdate() error {
 		return nil
 	}
 	if li.URL == "" || li.SHA256 == "" {
-		return errors.New("平台版本信息不完整（缺少地址或校验值）")
+		return errors.New("更新信息不完整，请稍后重试")
 	}
 	dlURL := li.URL
 	if !strings.HasPrefix(dlURL, "http://") && !strings.HasPrefix(dlURL, "https://") {
 		dlURL = a.platformBase() + dlURL
 	}
-	a.logf("info", "发现新版本 v%s，开始下载升级包…", li.Version)
+	a.logf("info", "发现新版本 v%s，正在下载…", li.Version)
 	updateFileLogf("start update: current=%s target=%s url=%s", appVersion, li.Version, dlURL)
 
 	// 下载（进度按 10% 步进推送日志）
 	dir := filepath.Join(os.Getenv("ProgramData"), "LiLink", "update")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("创建更新目录失败：%w", err)
+		return errors.New("更新准备失败，请检查磁盘空间后重试")
 	}
 	zipPath := filepath.Join(dir, "LiLink-update.zip")
 	if err := a.downloadFile(dlURL, zipPath); err != nil {
@@ -224,41 +224,37 @@ func (a *App) ApplyUpdate() error {
 	// SHA256 校验（失败即终止，不触碰现有程序）
 	got, err := fileSHA256(zipPath)
 	if err != nil {
-		return fmt.Errorf("读取升级包失败：%w", err)
+		return errors.New("安装包读取失败，请稍后重试")
 	}
 	if !strings.EqualFold(got, li.SHA256) {
 		_ = os.Remove(zipPath)
-		want := li.SHA256
-		if len(want) > 12 {
-			want = want[:12] + "…"
-		}
-		err := fmt.Errorf("升级包校验失败（期望 %s，实际 %s…），已放弃升级", want, got[:12])
-		a.logf("error", "%v", err)
+		err := errors.New("安装包校验未通过，已放弃本次升级")
+		a.logf("error", "%s", err)
 		updateFileLogf("sha256 mismatch: expect=%s got=%s", li.SHA256, got)
 		return err
 	}
-	a.logf("info", "升级包校验通过，正在解压并校验内容…")
+	a.logf("info", "正在准备安装…")
 	updateFileLogf("sha256 ok")
 
 	// 先解压校验内容，全部就绪后才停 Agent（避免停了连接才发现包不可用）
 	stage := filepath.Join(dir, "stage")
 	_ = os.RemoveAll(stage)
 	if err := extractZip(zipPath, stage); err != nil {
-		a.logf("error", "解压升级包失败：%v（已保留现有程序，未做任何替换）", err)
+		a.logf("error", "安装包解压失败，已保留当前版本")
 		updateFileLogf("unzip failed: %v", err)
-		return fmt.Errorf("解压升级包失败：%w", err)
+		return errors.New("安装包解压失败，已保留当前版本")
 	}
 	newGUI, err := findInDir(stage, "LiYouP2P.exe")
 	if err != nil {
 		a.logf("error", "升级包缺少 LiYouP2P.exe，已放弃升级（未做任何替换）")
 		updateFileLogf("zip missing LiYouP2P.exe")
-		return errors.New("升级包缺少 LiYouP2P.exe")
+		return errors.New("安装包内容不完整，已放弃本次升级")
 	}
 	newAgent, err := findInDir(stage, "liyou-agent.exe")
 	if err != nil {
-		a.logf("error", "升级包缺少 liyou-agent.exe，已放弃升级（未做任何替换）")
+		a.logf("error", "安装包内容不完整，已放弃本次升级")
 		updateFileLogf("zip missing liyou-agent.exe")
-		return errors.New("升级包缺少 liyou-agent.exe")
+		return errors.New("安装包内容不完整，已放弃本次升级")
 	}
 
 	// 内容就绪：停止 Agent 子进程（升级窗口期连接不可用）
@@ -276,16 +272,16 @@ func (a *App) ApplyUpdate() error {
 	}
 	if err := os.Rename(exePath, backup); err != nil {
 		updateFileLogf("backup rename failed: %v", err)
-		return fmt.Errorf("备份当前程序失败：%w", err)
+		return errors.New("升级准备失败，请稍后重试")
 	}
 	restore := func(why error) error {
 		_ = os.Rename(backup, exePath)
-		a.logf("error", "升级替换失败已回滚：%v", why)
+		a.logf("error", "升级未完成，已恢复为原版本")
 		updateFileLogf("rollback: %v", why)
-		return why
+		return errors.New("升级未完成，已恢复为原版本")
 	}
 	if err := copyFile(newGUI, exePath); err != nil {
-		return restore(fmt.Errorf("替换主程序失败：%w", err))
+		return restore(fmt.Errorf("替换程序文件失败：%w", err))
 	}
 	agentPath := filepath.Join(filepath.Dir(exePath), "liyou-agent.exe")
 	agentBackup := agentPath + ".old"
@@ -293,7 +289,7 @@ func (a *App) ApplyUpdate() error {
 	agentMoved := false
 	if _, err := os.Stat(agentPath); err == nil {
 		if err := os.Rename(agentPath, agentBackup); err != nil {
-			return restore(fmt.Errorf("备份 Agent 失败：%w", err))
+			return restore(fmt.Errorf("替换程序文件失败：%w", err))
 		}
 		agentMoved = true
 	}
@@ -301,7 +297,7 @@ func (a *App) ApplyUpdate() error {
 		if agentMoved {
 			_ = os.Rename(agentBackup, agentPath)
 		}
-		return restore(fmt.Errorf("替换 Agent 失败：%w", err))
+		return restore(fmt.Errorf("替换程序文件失败：%w", err))
 	}
 	updateFileLogf("replaced: gui+agent updated to %s, restarting", li.Version)
 	a.logf("info", "升级完成，应用即将重启…")
@@ -321,16 +317,16 @@ func (a *App) downloadFile(url, dest string) error {
 	client := &http.Client{Timeout: 30 * time.Minute}
 	resp, err := client.Get(url)
 	if err != nil {
-		return fmt.Errorf("下载失败：%w", err)
+		return fmt.Errorf("下载失败：%s", friendlyErr(err.Error()))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("下载失败：HTTP %d", resp.StatusCode)
+		return errors.New("下载失败，请稍后重试")
 	}
 	total := resp.ContentLength
 	out, err := os.Create(dest)
 	if err != nil {
-		return fmt.Errorf("保存升级包失败：%w", err)
+		return errors.New("保存安装包失败，请检查磁盘空间")
 	}
 	defer out.Close()
 	var done int64
@@ -341,7 +337,7 @@ func (a *App) downloadFile(url, dest string) error {
 		n, rerr := resp.Body.Read(buf)
 		if n > 0 {
 			if _, werr := out.Write(buf[:n]); werr != nil {
-				return fmt.Errorf("写入升级包失败：%w", werr)
+				return errors.New("保存安装包失败，请检查磁盘空间")
 			}
 			done += int64(n)
 			if total > 0 {
@@ -356,7 +352,7 @@ func (a *App) downloadFile(url, dest string) error {
 			break
 		}
 		if rerr != nil {
-			return fmt.Errorf("下载中断：%w", rerr)
+			return errors.New("下载中断，请检查网络后重试")
 		}
 	}
 	a.logf("info", "升级包下载完成（%.1f MB，用时 %d 秒）", float64(done)/1048576, int(time.Since(start).Seconds()))
