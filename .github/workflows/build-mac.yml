@@ -58,7 +58,7 @@ jobs:
               -o "../gui-wails/build/bin/agent-$arch" ./cmd/agent
           done
           lipo -create -output liyou-agent ../gui-wails/build/bin/agent-amd64 ../gui-wails/build/bin/agent-arm64
-          APP=../gui-wails/build/bin/LiLink.app
+          APP=../gui-wails/build/bin/LiYouP2P.app
           cp liyou-agent "$APP/Contents/MacOS/liyou-agent"
           chmod +x "$APP/Contents/MacOS/liyou-agent"
           rm ../gui-wails/build/bin/agent-amd64 ../gui-wails/build/bin/agent-arm64 liyou-agent
