@@ -869,7 +869,16 @@ func (a *App) OpenPage(localPort int) error {
 	}
 	url := fmt.Sprintf("http://127.0.0.1:%d", localPort)
 	a.logf("info", "正在打开本机页面…")
-	return exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	var cmd *exec.Cmd
+	switch goruntime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "linux":
+		cmd = exec.Command("xdg-open", url)
+	default:
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	}
+	return cmd.Start()
 }
 
 // ---------- 映射热增删（Agent 管理通道） ----------
