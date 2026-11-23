@@ -12,6 +12,7 @@ on:
         required: false
         default: ''
   push:
+    branches: [ci]
     tags:
       - 'mac-v*'
 

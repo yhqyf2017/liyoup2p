@@ -34,6 +34,7 @@ var logRules = []struct {
 	{regexp.MustCompile(`已连接(平台)?信令通道.*`), "已连接到服务器"},
 	{regexp.MustCompile(`信令通道就绪.*`), "已连接到服务器，服务已就绪"},
 	{regexp.MustCompile(`信令连接断开.*`), "与服务器的连接中断，正在自动重连…"},
+	{regexp.MustCompile(`防火墙自愈：.*`), "网络连接放行未完成：跨网直连可能不畅，请以管理员身份运行一次本程序"},
 	{regexp.MustCompile(`连接平台失败.*`), "暂时无法连接服务器，正在重试…"},
 	{regexp.MustCompile(`映射 (\S+) 已监听 \S+：本机访问 \S+ 即达服务端内网主机 (\S+) 的端口 (\d+)`), "已开通：本机端口 $1 ↔ 服务器内网主机 $2 的 $3 端口"},
 	{regexp.MustCompile(`映射 (\S+) 已监听 \S+：本机访问 \S+ 即达服务端端口 (\d+)`), "已开通：本机端口 $1 ↔ 服务器 $2 端口"},

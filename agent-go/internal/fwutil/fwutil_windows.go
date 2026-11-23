@@ -1,4 +1,7 @@
 // Package fwutil Windows 防火墙自愈：确保本程序存在入站 UDP 放行规则（跨网打洞必需）。
+// 仅 Windows 编译（netsh/UAC 均为 Windows 专属）；macOS/Linux 见 fwutil_other.go。
+//go:build windows
+
 package fwutil
 
 import (
