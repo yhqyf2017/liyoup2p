@@ -44,9 +44,9 @@ type latestInfo struct {
 // GetVersion 当前版本号（工作页顶栏展示）。
 func (a *App) GetVersion() string { return appVersion }
 
-// updateFileLogf 升级关键节点写入文件日志（windowsgui 无控制台，供排障与自动化验证）。
+// updateFileLogf 升级关键节点写入文件日志（供排障与自动化验证；目录由平台实现提供）。
 func updateFileLogf(format string, args ...any) {
-	dir := filepath.Join(os.Getenv("ProgramData"), "LiLink")
+	dir := updateLogDir()
 	_ = os.MkdirAll(dir, 0o755)
 	f, err := os.OpenFile(filepath.Join(dir, "update.log"), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
@@ -185,7 +185,7 @@ func (a *App) autoCheckUpdate() {
 	}
 }
 
-// ApplyUpdate 完整升级流程：下载 → 校验 → 停 Agent → 解压 → 备份替换 → 重启；任一步失败自动回滚。
+// ApplyUpdate 完整升级流程：下载 → 校验 → 平台安装（Windows 自动替换重启 / macOS 引导手动更新）；失败自动回滚或保留原版本。
 func (a *App) ApplyUpdate() error {
 	li, err := a.fetchLatest()
 	if err != nil {
@@ -211,7 +211,7 @@ func (a *App) ApplyUpdate() error {
 	updateFileLogf("start update: current=%s target=%s url=%s", appVersion, li.Version, dlURL)
 
 	// 下载（进度按 10% 步进推送日志）
-	dir := filepath.Join(os.Getenv("ProgramData"), "LiLink", "update")
+	dir := updateLogDir()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return errors.New("更新准备失败，请检查磁盘空间后重试")
 	}
@@ -236,80 +236,8 @@ func (a *App) ApplyUpdate() error {
 	a.logf("info", "正在准备安装…")
 	updateFileLogf("sha256 ok")
 
-	// 先解压校验内容，全部就绪后才停 Agent（避免停了连接才发现包不可用）
-	stage := filepath.Join(dir, "stage")
-	_ = os.RemoveAll(stage)
-	if err := extractZip(zipPath, stage); err != nil {
-		a.logf("error", "安装包解压失败，已保留当前版本")
-		updateFileLogf("unzip failed: %v", err)
-		return errors.New("安装包解压失败，已保留当前版本")
-	}
-	newGUI, err := findInDir(stage, "LiYouP2P.exe")
-	if err != nil {
-		a.logf("error", "升级包缺少 LiYouP2P.exe，已放弃升级（未做任何替换）")
-		updateFileLogf("zip missing LiYouP2P.exe")
-		return errors.New("安装包内容不完整，已放弃本次升级")
-	}
-	newAgent, err := findInDir(stage, "liyou-agent.exe")
-	if err != nil {
-		a.logf("error", "安装包内容不完整，已放弃本次升级")
-		updateFileLogf("zip missing liyou-agent.exe")
-		return errors.New("安装包内容不完整，已放弃本次升级")
-	}
-
-	// 内容就绪：停止 Agent 子进程（升级窗口期连接不可用）
-	a.StopAgent()
-
-	// 备份替换（主程序 + Agent），失败回滚
-	exePath, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	exePath, _ = filepath.Abs(exePath)
-	backup := exePath + ".old"
-	if err := os.Remove(backup); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	if err := os.Rename(exePath, backup); err != nil {
-		updateFileLogf("backup rename failed: %v", err)
-		return errors.New("升级准备失败，请稍后重试")
-	}
-	restore := func(why error) error {
-		_ = os.Rename(backup, exePath)
-		a.logf("error", "升级未完成，已恢复为原版本")
-		updateFileLogf("rollback: %v", why)
-		return errors.New("升级未完成，已恢复为原版本")
-	}
-	if err := copyFile(newGUI, exePath); err != nil {
-		return restore(fmt.Errorf("替换程序文件失败：%w", err))
-	}
-	agentPath := filepath.Join(filepath.Dir(exePath), "liyou-agent.exe")
-	agentBackup := agentPath + ".old"
-	_ = os.Remove(agentBackup)
-	agentMoved := false
-	if _, err := os.Stat(agentPath); err == nil {
-		if err := os.Rename(agentPath, agentBackup); err != nil {
-			return restore(fmt.Errorf("替换程序文件失败：%w", err))
-		}
-		agentMoved = true
-	}
-	if err := copyFile(newAgent, agentPath); err != nil {
-		if agentMoved {
-			_ = os.Rename(agentBackup, agentPath)
-		}
-		return restore(fmt.Errorf("替换程序文件失败：%w", err))
-	}
-	updateFileLogf("replaced: gui+agent updated to %s, restarting", li.Version)
-	a.logf("info", "升级完成，应用即将重启…")
-
-	// 重启：置位退出标记放行 beforeClose，退出后由 main 兜底拉起新进程（规避单实例锁竞态）
-	a.mu.Lock()
-	a.restartPending = true
-	a.exiting = true
-	a.mu.Unlock()
-	trayShutdown()
-	runtime.Quit(a.ctx)
-	return nil
+	// 平台安装：Windows 为解压替换自重启；macOS 为解压校验后引导手动更新
+	return a.installUpdate(li, zipPath)
 }
 
 // downloadFile 下载文件并按 10% 步进推送进度日志。

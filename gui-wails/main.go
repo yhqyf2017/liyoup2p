@@ -53,7 +53,6 @@ func main() {
 	}
 	// 兜底：确保托盘图标移除、进程真正结束（托盘退出路径已先停 Agent）
 	trayShutdown()
-	tray = nil
 	// 升级重启：进程退出后再拉起新版主程序（此时单实例锁已释放，规避竞态）
 	if app.restartPending {
 		if exe, err := os.Executable(); err == nil {

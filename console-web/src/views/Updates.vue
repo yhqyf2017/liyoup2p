@@ -3,19 +3,19 @@
     <div class="page-header">
       <div>
         <h2 class="ph-title">版本发布</h2>
-        <p class="ph-desc">PC / 安卓 / Win7 三通道安装包发布与版本管理</p>
+        <p class="ph-desc">PC / 安卓 / Win7 / Mac 四通道安装包发布与版本管理</p>
       </div>
       <div class="ph-actions">
         <el-button :icon="Refresh" circle text @click="loadAll" />
       </div>
     </div>
 
-    <!-- 三通道当前版本 -->
+    <!-- 四通道当前版本 -->
     <div class="channel-grid">
-      <div v-for="ch in ['pc', 'android', 'win7']" :key="ch" class="page-card channel-card">
+      <div v-for="ch in ['pc', 'android', 'win7', 'mac']" :key="ch" class="page-card channel-card">
         <div class="ch-head">
           <div class="ch-name">
-            <el-icon :size="18" class="ch-icon"><Monitor v-if="ch === 'pc'" /><Iphone v-else-if="ch === 'android'" /><Cpu v-else /></el-icon>
+            <el-icon :size="18" class="ch-icon"><Monitor v-if="ch === 'pc'" /><Iphone v-else-if="ch === 'android'" /><Platform v-else-if="ch === 'mac'" /><Cpu v-else /></el-icon>
             <span>{{ channelName(ch) }}</span>
           </div>
           <el-tag v-if="channels[ch] && channels[ch].version" type="success" size="small" effect="light">已发布</el-tag>
@@ -42,6 +42,7 @@
               <el-radio-button value="pc">PC 客户端</el-radio-button>
               <el-radio-button value="android">安卓客户端</el-radio-button>
               <el-radio-button value="win7">Win7 客户端</el-radio-button>
+              <el-radio-button value="mac">Mac 客户端</el-radio-button>
             </el-radio-group>
           </el-form-item>
           <el-form-item label="版本号" required>
@@ -99,18 +100,18 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Monitor, Iphone, Cpu, Refresh, UploadFilled } from '@element-plus/icons-vue'
+import { Monitor, Iphone, Cpu, Platform, Refresh, UploadFilled } from '@element-plus/icons-vue'
 import http from '../api'
 
-const CHANNEL_NAMES = { pc: 'PC 客户端', android: '安卓客户端', win7: 'Win7 客户端' }
-const channels = reactive({ pc: null, android: null, win7: null })
+const CHANNEL_NAMES = { pc: 'PC 客户端', android: '安卓客户端', win7: 'Win7 客户端', mac: 'Mac 客户端' }
+const channels = reactive({ pc: null, android: null, win7: null, mac: null })
 const form = reactive({ channel: 'pc', version: '', notes: '' })
 const file = ref(null)
 const uploading = ref(false)
 const progress = ref(0)
 const result = ref(null)
 
-const ACCEPT = { pc: ['.exe', '.zip'], android: ['.apk', '.zip'], win7: ['.exe', '.zip'] }
+const ACCEPT = { pc: ['.exe', '.zip'], android: ['.apk', '.zip'], win7: ['.exe', '.zip'], mac: ['.zip'] }
 const MAX_SIZE = 200 * 1024 * 1024
 
 const canSubmit = computed(
@@ -165,6 +166,9 @@ function loadAll() {
   http.get('/api/update/latest?ch=win7', { silent: true })
     .then((d) => { channels.win7 = d && d.version ? d : null })
     .catch(() => { channels.win7 = null })
+  http.get('/api/update/latest?ch=mac', { silent: true })
+    .then((d) => { channels.mac = d && d.version ? d : null })
+    .catch(() => { channels.mac = null })
 }
 
 function submit() {
@@ -226,12 +230,18 @@ onMounted(loadAll)
 
 .channel-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 16px;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1400px) {
+  .channel-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 860px) {
   .channel-grid {
     grid-template-columns: 1fr;
   }

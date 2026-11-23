@@ -1,24 +1,17 @@
 package main
 
-// 开机自启：HKCU Run 注册表项 + 用户偏好持久化。默认自启动；
-// 界面提供开关，偏好落盘以区分「默认开启」与「用户主动关闭」。
-// 注册表值携带 --autostart：开机拉起时 GUI 自动恢复登录态并启动连接、隐藏到托盘。
+// 开机自启：平台注册入口（Windows 注册表 Run 项 / macOS LaunchAgent）+ 用户偏好持久化。
+// 默认自启动；界面提供开关，偏好落盘以区分「默认开启」与「用户主动关闭」。
+// 注册入口携带 --autostart：开机拉起时 GUI 自动恢复登录态并启动连接、隐藏窗口。
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"time"
-
-	"golang.org/x/sys/windows/registry"
 )
 
-const (
-	runKeyPath   = `Software\Microsoft\Windows\CurrentVersion\Run`
-	runValueName = "LiLink"
-	autostartArg = "--autostart"
-)
+const autostartArg = "--autostart"
 
 // bootAutostart 本次启动是否为开机自启拉起（命令行携带 --autostart）。
 var bootAutostart = func() bool {
@@ -31,10 +24,15 @@ var bootAutostart = func() bool {
 }()
 
 // settingsPath 本机设置文件：开机自启偏好、登录记忆等（与登录态同目录但独立存盘，注销后保留）。
+// Windows 用 %ProgramData%（机器级共享）；macOS 用用户配置目录（~/Library/Application Support）。
 func settingsPath() string {
 	base := os.Getenv("ProgramData")
 	if base == "" {
-		base = "."
+		if d, err := os.UserConfigDir(); err == nil && d != "" {
+			base = d
+		} else {
+			base = "."
+		}
 	}
 	return filepath.Join(base, "LiYouP2P", "settings.json")
 }
@@ -80,53 +78,21 @@ func saveAutostartPref(on bool) error {
 	return writeSettings(m)
 }
 
-// autostartRegistered 当前是否已注册开机自启。
-func autostartRegistered() bool {
-	k, err := registry.OpenKey(registry.CURRENT_USER, runKeyPath, registry.QUERY_VALUE)
-	if err != nil {
-		return false
-	}
-	defer k.Close()
-	_, _, err = k.GetStringValue(runValueName)
-	return err == nil
-}
-
-// setAutostartRegistry 写入/删除 Run 项；写入时按当前 exe 路径生成命令
-// （程序移动/重装后自启入口始终指向最新安装位置）。
-func setAutostartRegistry(on bool) error {
-	k, err := registry.OpenKey(registry.CURRENT_USER, runKeyPath, registry.SET_VALUE|registry.QUERY_VALUE)
-	if err != nil {
-		return err
-	}
-	defer k.Close()
-	if !on {
-		if err := k.DeleteValue(runValueName); err != nil && !errors.Is(err, registry.ErrNotExist) {
-			return err
-		}
-		return nil
-	}
-	exe, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	return k.SetStringValue(runValueName, `"`+exe+`" `+autostartArg)
-}
-
-// ensureAutostart 启动时同步注册表与用户偏好：默认开启（从未设置过即注册），
-// 且每次启动都按当前 exe 路径刷新，规避安装位置变更后的失效入口。
+// ensureAutostart 启动时同步注册入口与用户偏好：默认开启（从未设置过即注册），
+// 且每次启动都按当前程序路径刷新，规避安装位置变更后的失效入口。
 func ensureAutostart() error {
 	pref := loadAutostartPref()
 	if pref == nil || *pref {
-		return setAutostartRegistry(true)
+		return setAutostartEnabled(true)
 	}
-	if autostartRegistered() {
-		return setAutostartRegistry(false)
+	if autostartEnabled() {
+		return setAutostartEnabled(false)
 	}
 	return nil
 }
 
-// autostartBoot 开机自启拉起后的自动接管：隐藏到托盘，恢复登录态并自动启动连接
-// （与托盘/主界面启动同一链路，状态事件自动同步到前端）。
+// autostartBoot 开机自启拉起后的自动接管：隐藏窗口，恢复登录态并自动启动连接
+// （与主界面启动同一链路，状态事件自动同步到前端）。
 func (a *App) autostartBoot() {
 	a.hideToTray()
 	deadline := time.Now().Add(15 * time.Second)
@@ -158,10 +124,10 @@ func (a *App) GetAutoStart() bool {
 	return pref == nil || *pref
 }
 
-// SetAutoStart 设置开机自启开关：写偏好 + 即时写/删注册表。
+// SetAutoStart 设置开机自启开关：写偏好 + 即时写/删平台注册入口。
 func (a *App) SetAutoStart(on bool) error {
 	if err := saveAutostartPref(on); err != nil {
 		return err
 	}
-	return setAutostartRegistry(on)
+	return setAutostartEnabled(on)
 }

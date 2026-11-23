@@ -194,6 +194,7 @@ func trayShutdown() {
 		return
 	}
 	tray.shutdown()
+	tray = nil
 }
 
 // trayPost 以消息方式跨线程触发托盘动作（自动化测试/程序化控制入口）。

@@ -1,7 +1,8 @@
 // 升级分发：多通道版本查询（免鉴权）+ 安装包发布/列表（superadmin）。
-// version.json 多通道格式：{"pc":{...},"android":{...},"win7":{...}}；
+// version.json 多通道格式：{"pc":{...},"android":{...},"win7":{...},"mac":{...}}；
 // 兼容旧单通道扁平格式（读到 pc 通道）；安装包本体由 /update/ 静态托管。
-// win7 通道面向 Win7 老系统客户端（gui-walk），安装包为 Inno Setup 双架构安装器。
+// win7 通道面向 Win7 老系统客户端（gui-walk），安装包为 Inno Setup 双架构安装器；
+// mac 通道面向 macOS 客户端（gui-wails darwin 构建），安装包为含 LiLink.app 的 zip。
 package api
 
 import (
@@ -31,6 +32,7 @@ type channels struct {
 	PC      *updateInfo `json:"pc"`
 	Android *updateInfo `json:"android"`
 	Win7    *updateInfo `json:"win7"`
+	Mac     *updateInfo `json:"mac"`
 }
 
 // UpdateAPI 升级 API：Dir 为平台 update 目录（version.json 与安装包）。
@@ -69,7 +71,7 @@ func (u *UpdateAPI) saveChannels(ch channels) error {
 }
 
 // Latest GET /api/update/latest（免鉴权）：默认/pc 返回 pc 通道扁平字段（兼容旧客户端），
-// ch=android / ch=win7 返回对应通道；通道缺失或文件不存在时 version 为空串。
+// ch=android / ch=win7 / ch=mac 返回对应通道；通道缺失或文件不存在时 version 为空串。
 func (u *UpdateAPI) Latest(w http.ResponseWriter, r *http.Request) {
 	ch := u.readChannels()
 	var sel *updateInfo
@@ -78,10 +80,12 @@ func (u *UpdateAPI) Latest(w http.ResponseWriter, r *http.Request) {
 		sel = ch.Android
 	case "win7":
 		sel = ch.Win7
+	case "mac":
+		sel = ch.Mac
 	case "", "pc":
 		sel = ch.PC
 	default:
-		Fail(w, http.StatusBadRequest, 1002, "未知更新通道，仅支持 pc / android / win7")
+		Fail(w, http.StatusBadRequest, 1002, "未知更新通道，仅支持 pc / android / win7 / mac")
 		return
 	}
 	if sel == nil {
@@ -105,7 +109,11 @@ func (u *UpdateAPI) List(w http.ResponseWriter, r *http.Request) {
 	if w7 == nil {
 		w7 = &updateInfo{}
 	}
-	OK(w, channels{PC: pc, Android: an, Win7: w7})
+	mac := ch.Mac
+	if mac == nil {
+		mac = &updateInfo{}
+	}
+	OK(w, channels{PC: pc, Android: an, Win7: w7, Mac: mac})
 }
 
 // Publish POST /api/platform/updates（superadmin，multipart：channel+version+notes+file）：
@@ -120,8 +128,8 @@ func (u *UpdateAPI) Publish(w http.ResponseWriter, r *http.Request) {
 	channel := strings.TrimSpace(r.FormValue("channel"))
 	version := strings.TrimSpace(r.FormValue("version"))
 	notes := strings.TrimSpace(r.FormValue("notes"))
-	if channel != "pc" && channel != "android" && channel != "win7" {
-		Fail(w, http.StatusBadRequest, 1002, "channel 仅支持 pc / android / win7")
+	if channel != "pc" && channel != "android" && channel != "win7" && channel != "mac" {
+		Fail(w, http.StatusBadRequest, 1002, "channel 仅支持 pc / android / win7 / mac")
 		return
 	}
 	if version == "" || strings.ContainsAny(version, `\/:*?"<>| `) || strings.Contains(version, "..") {

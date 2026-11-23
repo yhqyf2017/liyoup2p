@@ -1,0 +1,64 @@
+# macOS 客户端构建：产出通用二进制（Intel + Apple Silicon）的 LiLink.app 并打包 zip。
+# 触发：手动 dispatch（可填版本号）或推送 mac-v* 标签。
+# 产物：build/bin/LiLink-mac-<版本>.zip（zip 内为 LiLink.app，含 ad-hoc 签名，
+#       免开发者账号；用户首次打开需在「系统设置-隐私与安全性」放行一次）。
+name: build-mac
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（如 1.1.6），留空用默认'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'mac-v*'
+
+jobs:
+  build:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: gui-wails
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 解析版本号
+        id: ver
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            V="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref_name }}" == mac-v* ]]; then
+            V="${{ github.ref_name#mac-v }}"
+          else
+            V=$(sed -n 's/.*"productVersion": *"\([^"]*\)".*/\1/p' wails.json)
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "版本：$V"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: 安装 Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.9.1
+
+      - name: 构建 darwin universal
+        run: |
+          wails build -platform darwin/universal \
+            -ldflags "-s -w -X main.isRelease=true -X main.appVersion=${{ steps.ver.outputs.version }}"
+
+      - name: 打包 zip
+        run: |
+          cd build/bin
+          mv LiYouP2P.app LiLink.app
+          zip -qry "LiLink-mac-${{ steps.ver.outputs.version }}.zip" LiLink.app
+          ls -lh "LiLink-mac-${{ steps.ver.outputs.version }}.zip"
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: LiLink-mac-${{ steps.ver.outputs.version }}
+          path: gui-wails/build/bin/LiLink-mac-*.zip
+          if-no-files-found: error

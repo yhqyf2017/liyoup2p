@@ -1,4 +1,4 @@
-﻿# 励联 LiLink Win7 专用版一键构建（Go 1.20.14：Go 1.21+ 产物不支持 Win7）
+﻿﻿# 励联 LiLink Win7 专用版一键构建（Go 1.20.14：Go 1.21+ 产物不支持 Win7）
 # 产出：
 #   dist\win7\LiYouP2P-<arch>.exe / liyou-agent-<arch>.exe（amd64 + 386）
 #   dist\LiLink-pc-win7-<ver>-x64.zip / -x86.zip
