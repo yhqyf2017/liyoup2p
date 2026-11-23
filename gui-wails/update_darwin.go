@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -125,7 +126,7 @@ func appBundleRoot(exePath string) string {
 	dir := filepath.Dir(exePath)  // …/xxx.app/Contents/MacOS
 	dir = filepath.Dir(dir)       // …/xxx.app/Contents
 	bundle := filepath.Dir(dir)   // …/xxx.app
-	if filepath.Base(bundle) != ".app" && !filepath.Base(bundle).HasSuffix(".app") {
+	if name := filepath.Base(bundle); name == ".app" || !strings.HasSuffix(name, ".app") {
 		return ""
 	}
 	if st, err := os.Stat(bundle); err != nil || !st.IsDir() {
