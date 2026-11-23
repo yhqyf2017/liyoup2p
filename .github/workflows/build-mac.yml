@@ -29,8 +29,8 @@ jobs:
         run: |
           if [ -n "${{ github.event.inputs.version }}" ]; then
             V="${{ github.event.inputs.version }}"
-          elif [[ "${{ github.ref_name }}" == mac-v* ]]; then
-            V="${{ github.ref_name#mac-v }}"
+          elif [[ "$GITHUB_REF_NAME" == mac-v* ]]; then
+            V="${GITHUB_REF_NAME#mac-v}"
           else
             V=$(sed -n 's/.*"productVersion": *"\([^"]*\)".*/\1/p' wails.json)
           fi
