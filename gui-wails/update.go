@@ -22,8 +22,9 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// appVersion 当前 GUI 版本：发布包用 ldflags -X main.appVersion=1.1.6 注入。
-var appVersion = "1.1.6"
+// appVersion 当前 GUI 版本：发布包用 ldflags -X main.appVersion=x.y.z 注入
+// （CI 从 wails.json productVersion 读取；默认值与 wails.json 保持一致，双保险）。
+var appVersion = "1.1.10"
 
 // UpdateInfo 检查更新结果（返回给前端）。
 type UpdateInfo struct {

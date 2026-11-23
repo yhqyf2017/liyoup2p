@@ -6,8 +6,13 @@ import 'package:flutter/services.dart';
 
 import 'p2p_bridge.dart';
 
-/// 应用版本（与 pubspec.yaml version 保持一致，发布时同步更新）。
-const String kAppVersion = '1.1.6';
+/// 应用版本：构建时由脚本从 pubspec.yaml 的 version 自动注入
+/// （--dart-define=APP_VERSION=x.y.z），杜绝与 pubspec 漂移。
+/// defaultValue 仅兜底手动构建（与 pubspec version 保持一致）。
+const String kAppVersion = String.fromEnvironment(
+  'APP_VERSION',
+  defaultValue: '1.1.8',
+);
 
 /// 自动检查更新开关的持久化键（缺省为开启）。
 const String kAutoUpdateKey = 'update.auto';

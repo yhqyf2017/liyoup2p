@@ -16,8 +16,8 @@ import (
 // 构建：go build -ldflags "-s -w -H windowsgui -X main.isRelease=true -X main.appVersion=1.1.5"
 var isRelease = "false"
 
-// appVersion 版本号（构建期可注入）。
-var appVersion = "1.1.5"
+// appVersion 版本号（构建期可注入；默认值与 build-win7.ps1 的 $Ver 保持一致，双保险）。
+var appVersion = "1.1.10"
 
 // iconPNG 应用图标 256px（winres 另以多尺寸 PNG 嵌入 exe 资源作为安装器/任务栏图标源）。
 //
