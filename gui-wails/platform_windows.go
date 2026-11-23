@@ -101,8 +101,10 @@ func (a *App) showMainWindow() {
 	requestWinOp(winOpShow)
 }
 
-// startWindowServices 启动窗口服务：显隐串行消费循环 + 托盘常驻。
+// startWindowServices 启动窗口服务：挂起看门狗 + 窗口钩子 + 显隐串行消费循环 + 托盘常驻。
 func startWindowServices(a *App) {
+	startHangWatchdog()     // 卡死取证：持续挂起时落盘 goroutine 栈 + 事件流水
+	go installWindowHook(a) // 子类化主窗口：拦截最小化 → 隐藏到托盘
 	go runWinOpLoop(a)
 	startTray(a)
 }

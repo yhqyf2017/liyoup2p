@@ -6,7 +6,11 @@ package main
 // 关闭/最小化窗口 → 隐藏（进程常驻，连接不中断）；唤回 → 显示窗口。
 // wails runtime 调用内部会投递到主线程执行，任意 goroutine 调用安全。
 
-import "github.com/wailsapp/wails/v2/pkg/runtime"
+import (
+	"os/exec"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+)
 
 func (a *App) hideToTray() {
 	if a.ctx != nil {
@@ -32,3 +36,6 @@ func startWindowServices(a *App) {}
 
 // winTrace macOS 无看门狗，窗口日志转写日志面板（仅供排障）。
 func winTrace(format string, v ...any) {}
+
+// hideWindow macOS 无控制台窗口概念，子进程启动无需隐藏窗口。
+func hideWindow(cmd *exec.Cmd) {}

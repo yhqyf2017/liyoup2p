@@ -184,9 +184,7 @@ func (a *App) BuildMode() string {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	startHangWatchdog()     // 卡死取证：持续挂起时落盘 goroutine 栈 + 事件流水
-	go installWindowHook(a) // 子类化主窗口：拦截最小化 → 隐藏到托盘
-	startWindowServices(a)  // 平台专属窗口服务（Windows：显隐串行循环+托盘常驻；macOS：无托盘，空实现）
+	startWindowServices(a)  // 平台专属窗口服务（Windows：挂起看门狗+窗口钩子+显隐串行循环+托盘；macOS：空实现）
 	// 开机自启：默认开启，按用户偏好同步注册表（每次启动刷新 exe 路径）
 	if err := ensureAutostart(); err != nil {
 		a.logf("warn", "开机自启设置失败，请稍后重试")
