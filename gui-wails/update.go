@@ -102,10 +102,14 @@ func semverParts(s string) [3]int {
 	return out
 }
 
-// fetchLatest 拉取平台最新版本信息。
+// fetchLatest 拉取平台最新版本信息（按当前系统选择更新通道：Windows→pc / macOS→mac）。
 func (a *App) fetchLatest() (*latestInfo, error) {
+	ch := "pc"
+	if goruntime.GOOS == "darwin" {
+		ch = "mac"
+	}
 	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(a.platformBase() + "/api/update/latest")
+	resp, err := client.Get(a.platformBase() + "/api/update/latest?ch=" + ch)
 	if err != nil {
 		return nil, fmt.Errorf("无法连接平台：%w", err)
 	}
