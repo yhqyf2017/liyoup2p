@@ -190,6 +190,8 @@ func (u *UpdateAPI) Publish(w http.ResponseWriter, r *http.Request) {
 		ch.Android = &info
 	case "win7":
 		ch.Win7 = &info
+	case "mac":
+		ch.Mac = &info
 	}
 	if err := u.saveChannels(ch); err != nil {
 		Fail(w, http.StatusInternalServerError, 5000, "更新 version.json 失败: "+err.Error())
