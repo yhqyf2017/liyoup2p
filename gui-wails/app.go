@@ -18,6 +18,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	goruntime "runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -316,10 +317,16 @@ func (a *App) GetLogs() []LogEntry {
 
 // ---------- 会话持久化 ----------
 
+// sessionFile 登录态持久化文件（与自启偏好同目录）。
+// Windows 用 %ProgramData%（机器级共享）；macOS 用用户配置目录（~/Library/Application Support）。
 func sessionFile() string {
 	base := os.Getenv("ProgramData")
 	if base == "" {
-		base = "."
+		if d, err := os.UserConfigDir(); err == nil && d != "" {
+			base = d
+		} else {
+			base = "."
+		}
 	}
 	return filepath.Join(base, "LiYouP2P", "gui.json")
 }
@@ -599,8 +606,13 @@ func (a *App) Login(platformURL, tenant, user, pass, devName, role string, mappi
 
 // ---------- Agent 子进程 ----------
 
-// agentExe 定位同目录 liyou-agent.exe（环境变量 LIYOU_AGENT_EXE 可显式指定，测试/调试用）。
+// agentExe 定位同目录的连接内核程序（Windows: liyou-agent.exe / macOS: liyou-agent；
+// 环境变量 LIYOU_AGENT_EXE 可显式指定，测试/调试用）。
 func agentExe() (string, error) {
+	name := "liyou-agent"
+	if goruntime.GOOS == "windows" {
+		name = "liyou-agent.exe"
+	}
 	if p := strings.TrimSpace(os.Getenv("LIYOU_AGENT_EXE")); p != "" {
 		if _, err := os.Stat(p); err != nil {
 			return "", errors.New("程序文件不完整，请重新安装")
@@ -611,7 +623,7 @@ func agentExe() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	p := filepath.Join(filepath.Dir(exe), "liyou-agent.exe")
+	p := filepath.Join(filepath.Dir(exe), name)
 	if _, err := os.Stat(p); err != nil {
 		return "", errors.New("程序文件不完整，请重新安装")
 	}
