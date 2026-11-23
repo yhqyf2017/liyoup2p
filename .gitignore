@@ -50,6 +50,10 @@ Thumbs.db
 dist/
 *.exe~
 
+# 例外：Wails GUI 前端构建产物必须入库（CI 的 mac 构建依赖它，缺失会导致应用白屏）
+!gui-wails/frontend/dist/
+!gui-wails/frontend/dist/**
+
 # ===== Trae 内部计划文档 =====
 .trae/
 
